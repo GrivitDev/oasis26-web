@@ -18,7 +18,7 @@ export default async function HomePage() {
           <p className="text-xs font-bold uppercase tracking-[0.3em] text-[#e5bd77]">Together with their families</p>
           <h1 className="mt-6 font-serif text-5xl leading-none sm:text-7xl">{settings.brideName}<span className="mx-3 text-[#e5bd77]">&</span>{settings.groomName}</h1>
           <p className="mx-auto mt-6 max-w-xl text-base leading-7 text-stone-200">{settings.welcomeMessage}</p>
-          <div className="mx-auto my-10 grid aspect-square max-w-xs place-items-center rounded-full border-[12px] border-[#e5bd77]/40 bg-gradient-to-br from-[#f6ede1] to-[#bd8c3d] font-serif text-8xl text-[#6d2635] shadow-2xl">T&C</div>
+          <div className="mx-auto my-10 grid aspect-square max-w-xs place-items-center rounded-full border-[12px] border-[#e5bd77]/40 bg-gradient-to-br from-[#f6ede1] to-[#bd8c3d] font-serif text-8xl text-[#6d2635] shadow-2xl">J&P</div>
           <p className="font-serif text-2xl text-[#f4d89f]">{date.toLocaleDateString('en-NG', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
           <p className="mt-2 text-sm text-stone-200">Lagos, Nigeria</p>
           <div className="mx-auto mt-10 max-w-lg"><Countdown weddingDate={settings.weddingDate} /></div>

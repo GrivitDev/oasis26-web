@@ -3,7 +3,7 @@ import type { Metadata } from 'next';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'Tolu & Chinedu | Wedding Celebration',
+  title: 'Joseph & Praise | Wedding Celebration',
   description: 'Everything you need to celebrate Tolu and Chinedu.',
 };
 

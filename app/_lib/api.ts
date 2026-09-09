@@ -11,7 +11,7 @@ const fallbackSettings: Settings = {
   liveGalleryEnabled: false,
   donationEnabled: true,
   bankName: 'Example Bank',
-  accountName: 'Tolu & Chinedu Wedding',
+  accountName: 'Joseph & Praise Wedding',
   accountNumber: '0123456789',
   bridePhone: '+234 800 000 0001',
   groomPhone: '+234 800 000 0002',
