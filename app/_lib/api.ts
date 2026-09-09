@@ -3,8 +3,8 @@ import type { ContentItem, Media, Prayer, Program, Settings } from './types';
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
 
 const fallbackSettings: Settings = {
-  brideName: 'Tolu',
-  groomName: 'Chinedu',
+  brideName: 'Praise',
+  groomName: 'Joseph',
   weddingDate: '2026-12-19T11:00:00+01:00',
   welcomeMessage:
     'With grateful hearts, we invite you to celebrate the beginning of our forever.',
@@ -16,7 +16,7 @@ const fallbackSettings: Settings = {
   bridePhone: '+234 800 000 0001',
   groomPhone: '+234 800 000 0002',
   coordinatorPhone: '+234 800 000 0003',
-  email: 'hello@toluchinedu.com',
+  email: 'hello@PraiseJoseph.com',
 };
 
 const fallbackPrograms: Program[] = [

@@ -11,17 +11,17 @@ const item = (
 export const storyFallback = [
   item('story-1', 'story', 'A simple hello', 'How we met', 'A mutual friend introduced us over coffee in Lagos. The conversation lasted much longer than either of us planned.'),
   item('story-2', 'story', 'Growing together', 'Our journey', 'Through the ordinary days and the big milestones, we learned that friendship is the sweetest foundation for love.'),
-  item('story-3', 'story', 'The question', 'Our engagement', 'On a beautiful evening surrounded by the people we love, Chinedu asked and Tolu said yes.'),
+  item('story-3', 'story', 'The question', 'Our engagement', 'On a beautiful evening surrounded by the people we love, Joseph asked and Praise said yes.'),
 ];
 
 export const coupleFallback = [
-  item('bride', 'couple', 'Tolu Adeyemi', 'The bride', 'Warm-hearted, thoughtful, and always ready to host family and friends with a beautiful smile.'),
-  item('groom', 'couple', 'Chinedu Okafor', 'The groom', 'Calm, joyful, and deeply grateful to begin this next chapter alongside his best friend.'),
+  item('bride', 'couple', 'Praise Adeyemi', 'The bride', 'Warm-hearted, thoughtful, and always ready to host family and friends with a beautiful smile.'),
+  item('groom', 'couple', 'Joseph Okafor', 'The groom', 'Calm, joyful, and deeply grateful to begin this next chapter alongside his best friend.'),
 ];
 
 export const partyFallback = [
-  item('chief-bridesmaid', 'party', 'Amara Okafor', 'Chief bridesmaid', 'Tolu’s sister and lifelong best friend.'),
-  item('best-man', 'party', 'David Nwosu', 'Best man', 'Chinedu’s brother and trusted friend.'),
+  item('chief-bridesmaid', 'party', 'Amara Okafor', 'Chief bridesmaid', 'Praise’s sister and lifelong best friend.'),
+  item('best-man', 'party', 'David Nwosu', 'Best man', 'Joseph’s brother and trusted friend.'),
   item('bride-parents', 'party', 'Mr. & Mrs. Adeyemi', 'Parents of the bride', 'With love and thanksgiving.'),
   item('groom-parents', 'party', 'Mr. & Mrs. Okafor', 'Parents of the groom', 'With joy and blessing.'),
 ];

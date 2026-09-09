@@ -19,7 +19,7 @@ export function SiteHeader() {
     <header className="sticky top-0 z-50 border-b border-stone-200/80 bg-[#fffaf3]/95 backdrop-blur">
       <div className="mx-auto flex max-w-6xl items-center justify-between px-5 py-4">
         <Link href="/" className="font-serif text-xl font-semibold text-[#6d2635]">
-          T <span className="text-[#bd8c3d]">&</span> C
+          P <span className="text-[#bd8c3d]">&</span> J
         </Link>
 
         <nav className="hidden items-center gap-6 text-sm font-medium md:flex">
