@@ -10,19 +10,19 @@ const weddingParty = [
     title: 'Ring Bearer',
     names: [
       'Peniel Yesoko Victor-Bako',
-      'Kemuel Alubarikasko Akale',
+      'Kemuel Alubarikasoko Akale',
       'Othniel Yakpesoko Victor-Bako',
     ],
     accent: 'wine',
   },
   {
     title: 'Little Bride',
-    names: ['Na’ima Yahaya-Shuaibu', 'Joan Ejiri', 'Karis Nasarasko Akale'],
+    names: ['Na’ima Yahaya-Shuaibu', 'Joan Ejiri', 'Karis Nasarasoko Akale'],
     accent: 'mint',
   },
   {
     title: 'Best Man',
-    names: ['Innocent Richard Ajawo'],
+    names: ['Innocent Richard'],
     accent: 'emerald',
   },
   {
@@ -186,7 +186,7 @@ export function WeddingParty() {
         fill
         priority
         sizes="(min-width: 640px) 300px, 50vw"
-        className="object-cover object-center"
+        className="object-cover object-top"
       />
 
       <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-wine via-wine/30 to-transparent px-3 pb-3 pt-10">
@@ -210,7 +210,7 @@ export function WeddingParty() {
         fill
         priority
         sizes="(min-width: 640px) 300px, 50vw"
-        className="object-cover object-center"
+        className="object-cover object-top"
       />
 
       <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-emerald via-emerald/30 to-transparent px-3 pb-3 pt-10">

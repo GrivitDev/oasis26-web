@@ -8,12 +8,15 @@ import { useEffect, useState } from 'react';
 
 const events = [
   {
-    event: 'Traditional Wedding',
+    event: 'Traditional Marriage Rite',
     date: 'October 8, 2026',
     dateShort: '08 OCT',
-    time: '4:00 PM',
-    target: '2026-10-08T16:00:00+01:00',
-    message: 'Where heritage meets love, and two families begin to become one.',
+    time: '11:00 AM Prompt',
+    target: '2026-10-08T11:00:00+01:00',
+    venue:
+      'Bassa-Nge Anglican Grammar School, Gboloko, Kogi State.',
+    message:
+      'Where heritage meets love, and two families begin to become one.',
     accent: 'wine',
   },
   {
@@ -22,6 +25,8 @@ const events = [
     dateShort: '09 OCT',
     time: '4:00 PM',
     target: '2026-10-09T16:00:00+01:00',
+    venue:
+      'Bassa-Nge Anglican Grammar School, Gboloko, Kogi State.',
     message:
       'The evening before forever — laughter, stories, anticipation, and love.',
     accent: 'mint',
@@ -30,8 +35,10 @@ const events = [
     event: 'Church Wedding',
     date: 'October 10, 2026',
     dateShort: '10 OCT',
-    time: '10:00 AM',
+    time: '10:00 AM Prompt',
     target: '2026-10-10T10:00:00+01:00',
+    venue:
+      'Crowther Memorial Anglican Church, Lokoja.',
     message:
       'Before God and the people we love, two hearts become one.',
     accent: 'emerald',
@@ -40,15 +47,15 @@ const events = [
     event: 'Reception',
     date: 'October 10, 2026',
     dateShort: '10 OCT',
-    time: 'Immediately after',
+    time: 'After The Church Wedding',
     target: '2026-10-10T12:30:00+01:00',
+    venue:
+      'Kay Galaxy Event Center, along IBB Way, Zone 8, Opp. Civil Defence HQ, Old Okene/Kabba Road, Lokoja, Kogi State.',
     message:
       'Come celebrate the beginning of a beautiful new chapter with us.',
     accent: 'wine',
   },
 ];
-
-const venue = 'Crowther Memorial Anglican Church, Lokoja, Kogi State';
 
 const mapLink =
   'https://maps.app.goo.gl/ubbjAkbkuDiGBpsN9?g_st=ic';
@@ -158,8 +165,8 @@ export function EventVenues() {
           </h2>
 
           <p className="mx-auto mt-3 max-w-xl text-sm leading-6 text-ink-soft">
-            Four beautiful moments. One place to gather, celebrate, and make
-            memories together.
+            Four beautiful moments. Different places. One beautiful
+            celebration.
           </p>
         </div>
 
@@ -249,7 +256,7 @@ export function EventVenues() {
                           </p>
 
                           <p className="mt-0.5 text-xs leading-5 text-ink">
-                            {venue}
+                            {item.venue}
                           </p>
                         </div>
                       </div>
@@ -304,9 +311,11 @@ export function EventVenues() {
         {/* Scroll hint */}
         <div className="mt-1 flex items-center justify-center gap-2">
           <span className="h-px w-5 bg-wine/20" />
+
           <p className="text-[8px] font-bold uppercase tracking-[0.2em] text-ink-soft">
             Swipe to explore
           </p>
+
           <span className="h-px w-5 bg-emerald/20" />
         </div>
       </div>

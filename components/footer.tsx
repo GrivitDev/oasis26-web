@@ -1,7 +1,11 @@
-// src/components/footer.tsx
+'use client';
 
 import Image from 'next/image';
 import Link from 'next/link';
+import { Heart } from 'lucide-react';
+import { useState } from 'react';
+
+import RsvpModal from './rsvp-modal';
 
 const navigationLinks = [
   {
@@ -29,178 +33,349 @@ const celebrationLinks = [
   },
   {
     label: 'Programme',
-    href: '/program',
+    href: '/programs',
   },
   {
     label: 'Gallery',
     href: '/gallery',
   },
-  {
-    label: 'RSVP',
-    href: '/#rsvp',
-  },
 ];
 
+const accountDetails = {
+  bankName: 'Bank Name',
+  accountName: 'Joseph & Praise',
+  accountNumber: '0000000000',
+};
+
 export default function Footer() {
+  const [rsvpOpen, setRsvpOpen] = useState(false);
+
   return (
-    <footer className="relative overflow-hidden bg-emerald text-white">
-      {/* Decorative background */}
-      <div className="pointer-events-none absolute -left-24 top-0 h-56 w-56 rounded-full bg-mint/10 blur-3xl" />
-      <div className="pointer-events-none absolute -right-24 bottom-0 h-64 w-64 rounded-full bg-wine/20 blur-3xl" />
+    <>
+      <footer className="relative overflow-hidden bg-wine text-mint">
+        {/* ============================================================ */}
+        {/* ROMANTIC BACKGROUND */}
+        {/* ============================================================ */}
 
-      {/* Top decorative line */}
-      <div className="h-1 bg-gradient-to-r from-wine via-mint-dark to-wine" />
+        <div className="pointer-events-none absolute inset-0">
+          {/* Deep emerald centre glow */}
 
-      <div className="relative mx-auto max-w-7xl px-5 py-10 sm:px-4 sm:py-6 lg:px-5">
-        {/* Toast + Brand */}
-        <div className="flex flex-col items-center gap-12 sm:flex-row sm:items-center sm:justify-center sm:gap-16">
-          {/* Toast / Love message */}
+          <div className="absolute left-1/2 top-[16%] h-[460px] w-[760px] -translate-x-1/2 rounded-full bg-emerald/55 blur-[120px]" />
 
-<div className="relative flex h-45 w-45 shrink-0 items-center justify-center sm:h-52 sm:w-52">
-  {/* Heart */}
-  <div className="absolute left-1/2 top-[47%] h-44 w-44 -translate-x-1/2 -translate-y-1/2 rotate-45 rounded-[18px] bg-wine shadow-[0_16px_35px_rgba(0,0,0,0.18)]" />
+          {/* Emerald lower glow */}
 
-  <div className="absolute left-[24%] top-[13%] h-24 w-24 rounded-full bg-wine" />
+          <div className="absolute -left-[12%] bottom-[2%] h-[420px] w-[420px] rounded-full bg-emerald/45 blur-[110px]" />
 
-  <div className="absolute right-[24%] top-[13%] h-24 w-24 rounded-full bg-wine" />
+          {/* Mint upper-left glow */}
 
-  {/* Inner heart */}
-  <div className="absolute left-1/2 top-[48%] h-28 w-28 -translate-x-1/2 -translate-y-1/2 rotate-45 rounded-[16px] bg-wine/95 sm:h-30 sm:w-30" />
+          <div className="absolute -left-[10%] top-[8%] h-[300px] w-[300px] rounded-full bg-mint/25 blur-[90px]" />
 
-  {/* Content */}
-  <div className="relative z-10 w-[115px] -translate-y-1 text-center sm:w-[125px]">
-    <p className="text-[7px] font-bold uppercase tracking-[0.25em] text-mint">
-      A toast to love
-    </p>
+          {/* Mint upper-right glow */}
 
-    <h2 className="mt-2 font-[family-name:var(--font-cormorant)] text-[25px] font-semibold leading-[0.88] text-white sm:text-[28px]">
-      To forever,
-      <br />
-      together.
-    </h2>
+          <div className="absolute -right-[8%] top-[22%] h-[360px] w-[360px] rounded-full bg-mint/20 blur-[105px]" />
 
-    <div className="mx-auto mt-2.5 h-px w-8 bg-mint" />
+          {/* Emerald lower-right glow */}
 
-    <p className="mt-2 text-[10px] leading-[1.4] text-mint-light">
-      Here&apos;s to love, laughter, friendship and every beautiful moment
-      still to come.
-    </p>
-  </div>
-</div>
+          <div className="absolute -right-[12%] bottom-[8%] h-[430px] w-[430px] rounded-full bg-emerald/40 blur-[115px]" />
 
-          {/* Brand */}
-          <div className="text-center sm:text-left">
-            <div className="flex items-center justify-center gap-2.5 sm:justify-start">
-              <div className="flex h-35 w-35 items-center justify-center">
-                <Image
-                  src="/logo.png"
-                  alt="OASIS'26"
-                  width={90}
-                  height={90}
-                  className="h-40 w-40 object-contain"
-                />
-              </div>
+          {/* Soft romantic diagonal sheen */}
 
-              <div className="leading-none">
-                <p className="font-[family-name:var(--font-great-vibes)] text-3xl font-bold tracking-[0.04em]">
-                  <span className="text-mint">OASiS</span>
-                  <span className="text-white">&apos;26</span>
+          <div className="absolute inset-0 bg-gradient-to-br from-mint/10 via-transparent to-emerald/20" />
+
+          {/* Fine romantic texture */}
+
+          <div className="absolute inset-0 opacity-[0.12] [background-image:radial-gradient(circle_at_center,rgba(255,255,255,0.8)_0.7px,transparent_0.9px)] [background-size:22px_22px]" />
+        </div>
+
+        {/* ============================================================ */}
+        {/* TOP DECORATIVE LINE */}
+        {/* ============================================================ */}
+
+        <div className="relative z-10 h-1 bg-gradient-to-r from-emerald via-mint to-emerald" />
+
+        <div className="relative z-10 mx-auto max-w-7xl px-5 py-10 sm:px-4 sm:py-6 lg:px-5">
+          {/* ========================================================== */}
+          {/* TOAST + BRAND */}
+          {/* ========================================================== */}
+
+          <div className="flex flex-col items-center gap-12 sm:flex-row sm:items-center sm:justify-center sm:gap-16">
+            {/* ======================================================== */}
+            {/* TOAST / LOVE MESSAGE */}
+            {/* ======================================================== */}
+
+            <div className="relative flex h-45 w-45 shrink-0 items-center justify-center sm:h-52 sm:w-52">
+              {/* Outer glow */}
+
+              <div className="absolute inset-2 rounded-full bg-emerald/20 blur-2xl" />
+
+              {/* Heart */}
+
+              <div className="absolute left-1/2 top-[47%] h-44 w-44 -translate-x-1/2 -translate-y-1/2 rotate-45 rounded-[18px] bg-emerald shadow-[0_18px_42px_rgba(0,0,0,0.2)]" />
+
+              <div className="absolute left-[24%] top-[13%] h-24 w-24 rounded-full bg-emerald" />
+
+              <div className="absolute right-[24%] top-[13%] h-24 w-24 rounded-full bg-emerald" />
+
+              {/* Inner heart */}
+
+              <div className="absolute left-1/2 top-[48%] h-28 w-28 -translate-x-1/2 -translate-y-1/2 rotate-45 rounded-[16px] bg-emerald/95 sm:h-30 sm:w-30" />
+
+              {/* Content */}
+
+              <div className="relative z-10 w-[115px] -translate-y-1 text-center sm:w-[125px]">
+                <p className="text-[7px] font-bold uppercase tracking-[0.25em] text-mint">
+                  A toast to love
                 </p>
 
-                <p className="mt-0.5 text-[10px] font-semibold uppercase tracking-[0.2em] text-mint-light">
-                  Joseph &amp; Praise
+                <h2 className="mt-2 font-[family-name:var(--font-cormorant)] text-[25px] font-semibold leading-[0.88] text-mint sm:text-[28px]">
+                  To forever,
+                  <br />
+                  together.
+                </h2>
+
+                <div className="mx-auto mt-2.5 h-px w-8 bg-mint" />
+
+                <p className="mt-2 text-[10px] leading-[1.4] text-mint-light">
+                  Here&apos;s to love, laughter, friendship and every beautiful
+                  moment still to come.
                 </p>
               </div>
             </div>
 
-            <p className="mx-auto mt-2 max-w-sm text-xs leading-5 text-mint-light/75 sm:mx-0">
-              A celebration of love, family, faith, friendship and the
-              beginning of a beautiful new chapter.
+            {/* ======================================================== */}
+            {/* BRAND */}
+            {/* ======================================================== */}
+
+            <div className="text-center sm:text-left">
+              <div className="flex items-center justify-center gap-2.5 sm:justify-start">
+                <div className="flex h-35 w-35 items-center justify-center">
+                  <Image
+                    src="/logo.png"
+                    alt="OASIS'26"
+                    width={90}
+                    height={90}
+                    className="h-40 w-40 object-contain"
+                  />
+                </div>
+
+                <div className="leading-none">
+                  <p className="font-[family-name:var(--font-great-vibes)] text-3xl font-bold tracking-[0.04em]">
+                    <span className="text-mint">OASiS</span>
+                    <span className="text-mint">&apos;26</span>
+                  </p>
+
+                  <p className="mt-0.5 text-[10px] font-semibold uppercase tracking-[0.2em] text-mint">
+                    Joseph &amp; Praise
+                  </p>
+                </div>
+              </div>
+
+              <p className="mx-auto mt-2 max-w-sm text-xs leading-5 text-mint-light/80 sm:mx-0">
+                A celebration of love, family, faith, friendship and the
+                beginning of a beautiful new chapter.
+              </p>
+
+              {/* Footer RSVP */}
+
+              <button
+                type="button"
+                onClick={() => setRsvpOpen(true)}
+                className="group mt-4 inline-flex items-center gap-2 rounded-full bg-emerald px-4 py-2 text-[9px] font-bold uppercase tracking-[0.12em] text-mint shadow-[0_8px_20px_rgba(0,0,0,0.2)] transition-all duration-300 hover:-translate-y-0.5 hover:bg-emerald-dark hover:shadow-[0_10px_26px_rgba(0,0,0,0.25)]"
+              >
+                <Heart className="h-3.5 w-3.5 fill-current transition-transform duration-300 group-hover:scale-110" />
+
+                <span>
+                  RSVP
+                </span>
+              </button>
+            </div>
+          </div>
+
+          {/* ========================================================== */}
+          {/* NAVIGATION */}
+          {/* ========================================================== */}
+
+          <div className="mx-auto mt-4 max-w-4xl border-y border-mint/20 py-3">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-center sm:gap-6">
+              {/* Explore */}
+
+              <div className="text-center sm:text-left">
+                <p className="text-[8px] font-bold uppercase tracking-[0.28em] text-mint">
+                  Explore
+                </p>
+
+                <nav className="mt-1 flex flex-wrap items-center justify-center gap-x-0 gap-y-0 sm:justify-start">
+                  {navigationLinks.map((link, index) => (
+                    <span
+                      key={link.label}
+                      className="flex items-center"
+                    >
+                      <Link
+                        href={link.href}
+                        className="rounded-full px-2.5 py-1 text-xs text-mint-light transition-colors hover:bg-emerald/15 hover:text-mint"
+                      >
+                        {link.label}
+                      </Link>
+
+                      {index <
+                        navigationLinks.length - 1 && (
+                        <span className="text-[9px] text-mint/45">
+                          •
+                        </span>
+                      )}
+                    </span>
+                  ))}
+                </nav>
+              </div>
+
+              {/* Celebrate */}
+
+              <div className="text-center sm:text-left">
+                <p className="text-[8px] font-bold uppercase tracking-[0.28em] text-mint">
+                  Celebrate
+                </p>
+
+                <nav className="mt-1 flex flex-wrap items-center justify-center gap-x-0 gap-y-0 sm:justify-start">
+                  {celebrationLinks.map((link, index) => (
+                    <span
+                      key={link.label}
+                      className="flex items-center"
+                    >
+                      <Link
+                        href={link.href}
+                        className="rounded-full px-2.5 py-1 text-xs text-mint-light transition-colors hover:bg-emerald/15 hover:text-mint"
+                      >
+                        {link.label}
+                      </Link>
+
+                      {index <
+                        celebrationLinks.length - 1 && (
+                        <span className="text-[9px] text-mint/45">
+                          •
+                        </span>
+                      )}
+                    </span>
+                  ))}
+
+                  {/* RSVP */}
+
+                  <span className="flex items-center">
+                    <button
+                      type="button"
+                      onClick={() => setRsvpOpen(true)}
+                      className="rounded-full px-2.5 py-1 text-xs font-semibold text-mint transition-colors hover:bg-emerald/15 hover:text-mint-light"
+                    >
+                      RSVP
+                    </button>
+                  </span>
+                </nav>
+              </div>
+            </div>
+          </div>
+
+          {/* ========================================================== */}
+          {/* DONATION / SUPPORT */}
+          {/* ========================================================== */}
+
+          <div className="mx-auto mt-4 max-w-2xl overflow-hidden rounded-[20px] border border-mint/25 bg-emerald/15 shadow-[0_12px_35px_rgba(0,0,0,0.12)] backdrop-blur-md">
+            <div className="border-b border-mint/20 px-4 py-3 text-center">
+              <p className="text-[8px] font-bold uppercase tracking-[0.28em] text-mint">
+                Support &amp; Donations
+              </p>
+
+              <h3 className="mt-1 font-[family-name:var(--font-cormorant)] text-xl font-semibold text-mint sm:text-2xl">
+                Like to support our wedding?
+              </h3>
+
+              <p className="mx-auto mt-1 max-w-lg text-[10px] leading-4 text-mint-light/80 sm:text-xs">
+                Your support, prayers and generosity mean so much to us.
+                You can support our wedding using the account details below.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 divide-y divide-mint/20 sm:grid-cols-3 sm:divide-x sm:divide-y-0">
+              <div className="px-4 py-3 text-center">
+                <p className="text-[7px] font-bold uppercase tracking-[0.2em] text-mint">
+                  Bank Name
+                </p>
+
+                <p className="mt-1 text-xs font-semibold text-mint-light">
+                  {accountDetails.bankName}
+                </p>
+              </div>
+
+              <div className="px-4 py-3 text-center">
+                <p className="text-[7px] font-bold uppercase tracking-[0.2em] text-mint">
+                  Account Name
+                </p>
+
+                <p className="mt-1 text-xs font-semibold text-mint-light">
+                  {accountDetails.accountName}
+                </p>
+              </div>
+
+              <div className="px-4 py-3 text-center">
+                <p className="text-[7px] font-bold uppercase tracking-[0.2em] text-mint">
+                  Account Number
+                </p>
+
+                <p className="mt-1 text-xs font-semibold tracking-[0.08em] text-mint-light">
+                  {accountDetails.accountNumber}
+                </p>
+              </div>
+            </div>
+
+            <div className="border-t border-mint/20 px-4 py-3 text-center">
+              <p className="font-[family-name:var(--font-cormorant)] text-lg font-semibold text-mint">
+                Thank you for your support.
+              </p>
+
+              <p className="mt-0.5 text-[9px] text-mint-light/70">
+                May God bless you for being part of our celebration.
+              </p>
+            </div>
+          </div>
+
+          {/* ========================================================== */}
+          {/* SPECIAL CALLOUT */}
+          {/* ========================================================== */}
+
+          <div className="mx-auto mt-4 max-w-2xl rounded-[20px] border border-mint/25 bg-emerald/15 px-3 py-2 text-center shadow-[0_10px_30px_rgba(0,0,0,0.1)] backdrop-blur-md">
+            <p className="font-[family-name:var(--font-cormorant)] text-xl font-semibold text-mint sm:text-2xl">
+              Your presence is the greatest gift.
+            </p>
+
+            <p className="mt-1 text-[10px] leading-4 text-mint-light/75 sm:text-xs">
+              Thank you for being part of our story and for celebrating this
+              beautiful day with us.
             </p>
           </div>
-        </div>
 
-        {/* Navigation */}
-        <div className="mx-auto mt-4 max-w-4xl border-y border-white/10 py-3">
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-center sm:gap-6">
-            {/* Explore */}
-            <div className="text-center sm:text-left">
-              <p className="text-[8px] font-bold uppercase tracking-[0.28em] text-mint">
-                Explore
-              </p>
+          {/* ========================================================== */}
+          {/* BOTTOM */}
+          {/* ========================================================== */}
 
-              <nav className="mt-1 flex flex-wrap items-center justify-center gap-x-0 gap-y-0 sm:justify-start">
-                {navigationLinks.map((link, index) => (
-                  <span key={link.label} className="flex items-center">
-                    <Link
-                      href={link.href}
-                      className="rounded-full px-2.5 py-1 text-xs text-white/80 transition-colors hover:bg-white/5 hover:text-mint"
-                    >
-                      {link.label}
-                    </Link>
+          <div className="mt-3 flex flex-col items-center justify-between gap-2 border-t border-mint/20 pt-3 text-center sm:flex-row sm:text-left">
+            <p className="text-[9px] text-mint-light/55">
+              © 2026 OASIS&apos;26. All rights reserved.
+            </p>
 
-                    {index < navigationLinks.length - 1 && (
-                      <span className="text-[9px] text-mint/40">•</span>
-                    )}
-                  </span>
-                ))}
-              </nav>
-            </div>
-
-            {/* Celebrate */}
-            <div className="text-center sm:text-left">
-              <p className="text-[8px] font-bold uppercase tracking-[0.28em] text-mint">
-                Celebrate
-              </p>
-
-              <nav className="mt-1 flex flex-wrap items-center justify-center gap-x-0 gap-y-0 sm:justify-start">
-                {celebrationLinks.map((link, index) => (
-                  <span key={link.label} className="flex items-center">
-                    <Link
-                      href={link.href}
-                      className="rounded-full px-2.5 py-1 text-xs text-white/80 transition-colors hover:bg-white/5 hover:text-mint"
-                    >
-                      {link.label}
-                    </Link>
-
-                    {index < celebrationLinks.length - 1 && (
-                      <span className="text-[9px] text-mint/40">•</span>
-                    )}
-                  </span>
-                ))}
-              </nav>
-            </div>
+            <Link
+              href="https://wa.me/2348164580712"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-[9px] font-semibold uppercase tracking-[0.12em] text-mint transition-colors hover:text-mint-light"
+            >
+              Website designed by Grivit Tech Studios
+            </Link>
           </div>
         </div>
+      </footer>
 
-        {/* Special callout */}
-        <div className="mx-auto mt-4 max-w-2xl rounded-[20px] border border-mint/20 bg-white/5 px-3 py-2 text-center backdrop-blur-sm">
-          <p className="font-[family-name:var(--font-cormorant)] text-xl font-semibold text-mint sm:text-2xl">
-            Your presence is the greatest gift.
-          </p>
-
-          <p className="mt-1 text-[10px] leading-4 text-white/60 sm:text-xs">
-            Thank you for being part of our story and for celebrating this
-            beautiful day with us.
-          </p>
-        </div>
-
-        {/* Bottom */}
-        <div className="mt-3 flex flex-col items-center justify-between gap-2 border-t border-white/10 pt-3 text-center sm:flex-row sm:text-left">
-          <p className="text-[9px] text-white/45">
-            © 2026 OASIS&apos;26. All rights reserved.
-          </p>
-
-          <Link
-            href="https://wa.me/2348164580712"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-[9px] font-semibold uppercase tracking-[0.12em] text-mint transition-colors hover:text-white"
-          >
-            Website designed by Grivit Tech Studios
-          </Link>
-        </div>
-      </div>
-    </footer>
+      <RsvpModal
+        open={rsvpOpen}
+        onClose={() => setRsvpOpen(false)}
+      />
+    </>
   );
 }

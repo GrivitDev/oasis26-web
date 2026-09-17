@@ -9,6 +9,7 @@ import Navbar from '@/components/navbar';
 import Footer from '@/components/footer';
 
 import { SEO } from '@/config/seo';
+import { Suspense } from 'react';
 
 const cormorant = Cormorant_Garamond({
   variable: '--font-cormorant',
@@ -183,8 +184,11 @@ export default function RootLayout({
       <body
         className={`${cormorant.variable} ${greatVibes.variable} min-h-screen overflow-x-hidden bg-cream text-ink antialiased`}
       >
-        <div className="flex min-h-screen flex-col">
-          <Navbar />
+        <div className="relative flex min-h-screen flex-col">
+          
+          <Suspense fallback={null}>
+            <Navbar />
+          </Suspense>
 
           <main className="relative z-0 flex-1">
             {children}

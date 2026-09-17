@@ -2,8 +2,10 @@
 
 import { EventVenues } from '@/components/event-venues';
 import { HomeHero } from '../components/home-hero';
-import {OurStory} from '@/components/our-story'
+import { OurStory } from '@/components/our-story';
 import { WeddingParty } from '@/components/wedding-party';
+import BlessingsPrayers from '@/components/blessings-prayers';
+import GalleryPreview from '@/components/gallery-preview';
 
 export default function HomePage() {
   return (
@@ -15,9 +17,13 @@ export default function HomePage() {
 
       <OurStory />
 
-      <WeddingParty/>
+      <WeddingParty />
 
-            <EventVenues />
+      <EventVenues />
+
+      <GalleryPreview />
+
+      <BlessingsPrayers />
     </main>
   );
 }
