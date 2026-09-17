@@ -1,20 +1,74 @@
-import Link from 'next/link';
+// src/app/gallery/page.tsx
 
-import { LiveGalleryUpload } from '../_components/live-gallery-upload';
-import { EmptyState, PageHero, PageShell } from '../_components/page-shell';
-import { weddingApi } from '../_lib/api';
-import type { Media } from '../_lib/types';
+export default function GalleryPage() {
+  const photos = [
+    {
+      id: 1,
+      label: 'The Beginning',
+      className: 'aspect-[4/5] bg-wine-soft',
+    },
+    {
+      id: 2,
+      label: 'Together',
+      className: 'aspect-square bg-mint-light',
+    },
+    {
+      id: 3,
+      label: 'Forever',
+      className: 'aspect-[4/5] bg-emerald-soft',
+    },
+    {
+      id: 4,
+      label: 'Our Day',
+      className: 'aspect-square bg-blush',
+    },
+    {
+      id: 5,
+      label: 'Love & Laughter',
+      className: 'aspect-[4/5] bg-mint',
+    },
+    {
+      id: 6,
+      label: 'A Beautiful Memory',
+      className: 'aspect-square bg-wine-soft',
+    },
+  ];
 
-function MediaGrid({ media }: { media: Media[] }) {
-  if (!media.length) {
-    return <EmptyState>Photos and videos will appear here once they are published.</EmptyState>;
-  }
+  return (
+    <main className="min-h-screen bg-cream px-5 py-10 sm:px-8 sm:py-14">
+      <div className="mx-auto max-w-6xl">
+        {/* Page heading */}
+        <header className="mx-auto max-w-2xl text-center">
+          <p className="text-[10px] font-bold uppercase tracking-[0.3em] text-emerald">
+            OASIS&apos;26
+          </p>
 
-  return <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">{media.map(item => <a key={item._id} href={item.url} target="_blank" rel="noreferrer" className="group overflow-hidden rounded-2xl border border-[#e9dfd2] bg-white"><div className="grid aspect-[4/3] place-items-center bg-gradient-to-br from-[#f6ede1] to-[#ead1ad] p-5 text-center font-serif text-2xl text-[#6d2635] transition group-hover:scale-105">{item.resourceType === 'video' ? 'Wedding video' : 'Wedding photo'}</div><div className="p-4"><p className="text-sm font-semibold">{item.caption || 'A beautiful wedding moment'}</p><p className="mt-1 text-xs text-stone-500">{item.uploaderName || item.category || 'Official gallery'}</p></div></a>)}</div>;
-}
+          <h1 className="mt-3 font-[family-name:var(--font-cormorant)] text-5xl font-semibold leading-none text-wine sm:text-6xl">
+            Our Gallery
+          </h1>
 
-export default async function GalleryPage() {
-  const [settings, official, live] = await Promise.all([weddingApi.settings(), weddingApi.media('official'), weddingApi.media('live')]);
+          <p className="mx-auto mt-4 max-w-xl text-sm leading-6 text-ink-soft sm:text-base">
+            A collection of beautiful moments from a day we will always
+            remember.
+          </p>
+        </header>
 
-  return <PageShell><PageHero eyebrow="Every cherished moment" title="Wedding gallery" description="Browse the official memories and, when the live gallery is open, share the moments you capture." /><section className="mx-auto max-w-6xl px-5 py-16"><div className="mb-12"><p className="text-xs font-bold uppercase tracking-wider text-[#bd8c3d]">Official gallery</p><h2 className="mt-2 font-serif text-4xl text-[#6d2635]">Our photographs</h2><div className="mt-6"><MediaGrid media={official} /></div></div><div className="grid gap-8 lg:grid-cols-[1fr_380px]"><div><p className="text-xs font-bold uppercase tracking-wider text-[#bd8c3d]">Live gallery</p><h2 className="mt-2 font-serif text-4xl text-[#6d2635]">Captured by our guests</h2><div className="mt-6"><MediaGrid media={live} /></div></div><LiveGalleryUpload enabled={settings.liveGalleryEnabled} /></div><p className="mt-8 text-center text-sm text-stone-500">Want the official photographs when they are ready? <Link href="/contact" className="font-semibold text-[#6d2635]">Contact us.</Link></p></section></PageShell>;
+        {/* Gallery */}
+        <section className="mt-10 columns-2 gap-3 sm:mt-14 sm:columns-3 sm:gap-4">
+          {photos.map((photo) => (
+            <div
+              key={photo.id}
+              className={`group mb-3 break-inside-avoid overflow-hidden rounded-[22px] border border-sand-dark/70 shadow-sm transition duration-300 hover:-translate-y-1 hover:shadow-lg sm:mb-4 sm:rounded-[26px] ${photo.className}`}
+            >
+              <div className="flex h-full min-h-40 items-end bg-gradient-to-t from-ink/40 via-transparent to-transparent p-4">
+                <span className="font-[family-name:var(--font-cormorant)] text-xl font-semibold text-white sm:text-2xl">
+                  {photo.label}
+                </span>
+              </div>
+            </div>
+          ))}
+        </section>
+      </div>
+    </main>
+  );
 }

@@ -1,14 +1,121 @@
 @import "tailwindcss";
 
 :root {
+  /* ============================================================
+     WEDDING COLOR PALETTE
+     ============================================================ */
+
+  --wine: #72263a;
+  --wine-dark: #541a2a;
+  --wine-light: #8f4054;
+  --wine-soft: #f4e6ea;
+
+  --mint: #cfeee1;
+  --mint-dark: #a9dcc9;
+  --mint-light: #e8f8f1;
+  --mint-soft: #f3fbf7;
+
+  --emerald: #002c20;
+  --emerald-dark: #011c14;
+  --emerald-light: #069067;
+  --emerald-soft: #e1f3ed;
+
+  /* ============================================================
+     COMPLEMENTARY / NEUTRAL COLORS
+     ============================================================ */
+
+  --cream: #fffaf6;
+  --ivory: #fffdf9;
+  --white: #ffffff;
+
+  --sand: #f3ede6;
+  --sand-dark: #e4d8cc;
+
   --ink: #24201c;
-  --wine: #6d2635;
-  --gold: #bd8c3d;
-  --cream: #fffaf3;
+  --ink-soft: #5c514b;
+
+  --gray-light: #e8e8e5;
+  --gray: #9a958f;
+  --gray-dark: #6f6963;
+
+  /* ============================================================
+     ACCENT COLORS
+     ============================================================ */
+
+  --blush: #efd7dc;
+  --rose: #c98291;
+
+  --sage: #9bbfae;
+  --forest: #174f40;
+
+  --champagne: #ead9b8;
+  --champagne-light: #f7efdf;
+
+  /* ============================================================
+     UI / STATE COLORS
+     ============================================================ */
+
+  --success: #16805e;
+  --success-soft: #e6f5ef;
+
+  --warning: #b7791f;
+  --warning-soft: #fff4db;
+
+  --danger: #b33a4d;
+  --danger-soft: #fae8ec;
+}
+
+@theme inline {
+  --color-wine: var(--wine);
+  --color-wine-dark: var(--wine-dark);
+  --color-wine-light: var(--wine-light);
+  --color-wine-soft: var(--wine-soft);
+
+  --color-mint: var(--mint);
+  --color-mint-dark: var(--mint-dark);
+  --color-mint-light: var(--mint-light);
+  --color-mint-soft: var(--mint-soft);
+
+  --color-emerald: var(--emerald);
+  --color-emerald-dark: var(--emerald-dark);
+  --color-emerald-light: var(--emerald-light);
+  --color-emerald-soft: var(--emerald-soft);
+
+  --color-cream: var(--cream);
+  --color-ivory: var(--ivory);
+  --color-white: var(--white);
+
+  --color-sand: var(--sand);
+  --color-sand-dark: var(--sand-dark);
+
+  --color-ink: var(--ink);
+  --color-ink-soft: var(--ink-soft);
+
+  --color-gray-light: var(--gray-light);
+  --color-gray: var(--gray);
+  --color-gray-dark: var(--gray-dark);
+
+  --color-blush: var(--blush);
+  --color-rose: var(--rose);
+
+  --color-sage: var(--sage);
+  --color-forest: var(--forest);
+
+  --color-champagne: var(--champagne);
+  --color-champagne-light: var(--champagne-light);
+
+  --color-success: var(--success);
+  --color-success-soft: var(--success-soft);
+
+  --color-warning: var(--warning);
+  --color-warning-soft: var(--warning-soft);
+
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
 }
 
 * {
-  border-color: #e9dfd2;
+  border-color: var(--sand-dark);
 }
 
 html {
@@ -29,6 +136,6 @@ textarea {
 }
 
 ::selection {
-  background: #f1d6a4;
-  color: var(--ink);
+  background: var(--mint);
+  color: var(--wine);
 }
