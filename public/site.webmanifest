@@ -1,0 +1,23 @@
+
+
+{
+  "name": "OASIS'26 | Joseph & Praise Wedding",
+  "short_name": "OASIS'26",
+  "description": "The wedding celebration of Joseph & Praise.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#fffaf6",
+  "theme_color": "#025740",
+  "icons": [
+    {
+      "src": "/favicon.ico",
+      "sizes": "any",
+      "type": "image/x-icon"
+    },
+    {
+      "src": "/apple-touch-icon.png",
+      "sizes": "180x180",
+      "type": "image/png"
+    }
+  ]
+}

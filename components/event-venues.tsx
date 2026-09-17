@@ -86,10 +86,18 @@ function getCountdown(target: string): Countdown {
 }
 
 function EventCountdown({ target }: { target: string }) {
-  const [countdown, setCountdown] = useState(() => getCountdown(target));
+  const [countdown, setCountdown] = useState<Countdown>({
+    days: '00',
+    hours: '00',
+    minutes: '00',
+    seconds: '00',
+    complete: false,
+  });
 
   useEffect(() => {
-    const update = () => setCountdown(getCountdown(target));
+    const update = () => {
+      setCountdown(getCountdown(target));
+    };
 
     update();
 

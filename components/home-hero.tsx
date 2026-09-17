@@ -66,44 +66,63 @@ export function HomeHero({
   return (
     <section
       id="home"
-      className="relative -mt-[76px] overflow-hidden bg-cream px-2 pb-2.5 pt-[82px] sm:-mt-[84px] sm:px-3 sm:pb-3 sm:pt-[92px]"
+      className="relative isolate overflow-hidden bg-cream px-2 pb-2.5 sm:px-3 sm:pb-3"
     >
-      {/* Background image */}
-      <div className="absolute inset-y-0 right-0 hidden w-[58%] lg:block">
-        <Image
-          src={backgroundImage}
-          alt=""
-          fill
-          priority
-          className="object-cover object-center"
-        />
+      {/* ============================================================
+          BACKGROUND
+          Extends behind the navbar.
+          ============================================================ */}
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-x-0 -top-[76px] bottom-0 z-[-1] sm:-top-[84px]"
+      >
+        {/* Desktop */}
+        <div className="absolute inset-y-0 right-0 hidden w-[58%] lg:block">
+          <Image
+            src={backgroundImage}
+            alt=""
+            fill
+            priority
+            sizes="58vw"
+            className="object-cover object-center"
+          />
 
-        <div className="absolute inset-0 bg-gradient-to-r from-cream via-cream/80 to-transparent" />
-        <div className="absolute inset-0 bg-gradient-to-t from-cream/70 via-transparent to-transparent" />
+          <div className="absolute inset-0 bg-gradient-to-r from-cream via-cream/80 to-transparent" />
+
+          <div className="absolute inset-0 bg-gradient-to-t from-cream/70 via-transparent to-transparent" />
+        </div>
+
+        {/* Mobile */}
+        <div className="absolute right-0 top-0 h-[42%] w-full overflow-hidden lg:hidden">
+          <Image
+            src={backgroundImage}
+            alt=""
+            fill
+            priority
+            sizes="100vw"
+            className="object-cover object-center"
+          />
+
+          <div className="absolute inset-0 bg-gradient-to-b from-transparent via-cream/15 to-cream" />
+        </div>
       </div>
 
-      {/* Mobile background */}
-      <div className="absolute right-0 top-0 h-[34%] w-full overflow-hidden lg:hidden">
-        <Image
-          src={backgroundImage}
-          alt=""
-          fill
-          priority
-          className="object-cover object-center"
-        />
-
-        <div className="absolute inset-0 bg-gradient-to-b from-transparent via-cream/15 to-cream" />
-      </div>
-
-      <div className="relative mx-auto max-w-7xl">
+      {/* ============================================================
+          CONTENT
+          The top padding creates the navbar clearance.
+          ============================================================ */}
+      <div className="relative z-10 mx-auto max-w-7xl pt-[76px] sm:pt-[84px]">
         <div className="relative overflow-hidden rounded-[28px] border border-wine/10 bg-ivory/78 shadow-[0_16px_50px_rgba(84,26,42,0.11)] backdrop-blur-sm sm:rounded-[34px]">
           {/* Decorative glow */}
-          <div className="pointer-events-none absolute -left-20 top-16 h-64 w-64 rounded-full bg-mint/30 blur-3xl" />
-          <div className="pointer-events-none absolute -right-16 bottom-0 h-64 w-64 rounded-full bg-emerald/15 blur-3xl" />
+          <div className="pointer-events-none absolute -left-20 top-16 z-0 h-64 w-64 rounded-full bg-mint/30 blur-3xl" />
+
+          <div className="pointer-events-none absolute -right-16 bottom-0 z-0 h-64 w-64 rounded-full bg-emerald/15 blur-3xl" />
 
           <div className="relative z-10 grid lg:grid-cols-[1.08fr_0.92fr]">
-            {/* Main image */}
-            <div className="relative flex items-center justify-center px-4 pb-3 pt-20 sm:px-6 sm:pb-5 sm:pt-24 lg:min-h-[calc(100vh-92px)] lg:px-8 lg:py-8">
+            {/* ======================================================
+                MAIN IMAGE
+                ====================================================== */}
+            <div className="relative flex items-center justify-center px-4 pb-3 pt-16 sm:px-6 sm:pb-5 sm:pt-20 lg:min-h-[calc(100vh-84px)] lg:px-8 lg:py-8">
               {/* OASIS label */}
               <div className="absolute left-4 top-4 z-20 rounded-full border border-wine/15 bg-white/60 px-3 py-1.5 shadow-sm backdrop-blur-md sm:left-6 sm:top-6 sm:px-4 sm:py-2">
                 <span className="font-[family-name:var(--font-great-vibes)] text-xl text-wine sm:text-2xl">
@@ -118,12 +137,13 @@ export function HomeHero({
                 <div className="absolute -inset-2 rotate-[2deg] rounded-[34px] border border-wine/15 sm:-inset-3 sm:rounded-[40px]" />
 
                 <div className="relative overflow-hidden rounded-[30px] border-[5px] border-white bg-white shadow-[0_24px_65px_rgba(84,26,42,0.2)] sm:rounded-[36px] sm:border-[6px]">
-                  <div className="aspect-[4/5]">
+                  <div className="relative aspect-[4/5]">
                     <Image
                       src={mainImage}
                       alt="Praise and Joseph"
                       fill
                       priority
+                      sizes="(min-width: 1280px) 560px, (min-width: 1024px) 48vw, 92vw"
                       className="object-cover object-center"
                     />
                   </div>
@@ -143,7 +163,9 @@ export function HomeHero({
               </div>
             </div>
 
-            {/* Details */}
+            {/* ======================================================
+                DETAILS
+                ====================================================== */}
             <div className="relative flex items-center px-4 pb-7 pt-4 sm:px-7 sm:pb-9 lg:px-9 lg:py-10 xl:px-12">
               <div className="w-full max-w-2xl">
                 <p className="hidden font-[family-name:var(--font-great-vibes)] text-4xl leading-none text-wine lg:block xl:text-5xl">
@@ -226,7 +248,7 @@ export function HomeHero({
           </div>
 
           {/* Bottom ornament */}
-          <div className="pointer-events-none absolute bottom-2 left-1/2 hidden -translate-x-1/2 items-center gap-2 sm:flex">
+          <div className="pointer-events-none absolute bottom-2 left-1/2 z-20 hidden -translate-x-1/2 items-center gap-2 sm:flex">
             <span className="h-px w-7 bg-wine/20" />
             <span className="h-1.5 w-1.5 rounded-full bg-mint-dark" />
             <span className="h-2 w-2 rotate-45 border border-wine/25" />

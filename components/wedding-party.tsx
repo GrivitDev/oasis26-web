@@ -175,41 +175,53 @@ export function WeddingParty() {
           </p>
         </div>
 
-        {/* Bride + Groom */}
-        <div className="mx-auto mt-6 flex max-w-2xl gap-2 sm:mt-8 sm:gap-4">
-          {/* Groom */}
-          <div className="relative min-w-0 flex-1 overflow-hidden rounded-[20px] border border-wine/15 bg-wine-soft/70">
-            <div className="relative aspect-[3/4]">
-              <Image
-                src="/groom.jpg"
-                alt="Groom"
-                fill
-                priority
-                className="object-cover object-center"
-              />
+{/* Bride + Groom */}
+<div className="mx-auto mt-6 flex max-w-2xl gap-2 sm:mt-8 sm:gap-4">
+  {/* Groom */}
+  <div className="relative min-w-0 flex-1 overflow-hidden rounded-[20px] border border-wine/15 bg-wine-soft/70">
+    <div className="relative aspect-[3/4]">
+      <Image
+        src="/groom.jpg"
+        alt="Groom"
+        fill
+        priority
+        sizes="(min-width: 640px) 300px, 50vw"
+        className="object-cover object-center"
+      />
 
-              <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-wine via-wine/30 to-transparent px-3 pb-3 pt-10">
-                <p className="font-[family-name:var(--font-great-vibes)] text-xl leading-none text-white sm:text-2xl">
-                  Joseph
-                </p>
+      <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-wine via-wine/30 to-transparent px-3 pb-3 pt-10">
+        <p className="font-[family-name:var(--font-great-vibes)] text-xl leading-none text-white sm:text-2xl">
+          Joseph
+        </p>
 
-                <p className="mt-0.5 text-[6px] font-bold uppercase tracking-[0.18em] text-mint">
-                  The Groom
-                </p>
-              </div>
-            </div>
-          </div>
+        <p className="mt-0.5 text-[6px] font-bold uppercase tracking-[0.18em] text-mint">
+          The Groom
+        </p>
+      </div>
+    </div>
+  </div>
 
-          {/* Bride */}
-          <div className="relative min-w-0 flex-1 overflow-hidden rounded-[20px] border border-emerald/15 bg-mint-light/70">
-            <div className="relative aspect-[3/4]">
-              <Image
-                src="/bride.jpg"
-                alt="Bride"
-                fill
-                priority
-                className="object-cover object-center"
-              />
+  {/* Bride */}
+  <div className="relative min-w-0 flex-1 overflow-hidden rounded-[20px] border border-emerald/15 bg-mint-light/70">
+    <div className="relative aspect-[3/4]">
+      <Image
+        src="/bride.jpg"
+        alt="Bride"
+        fill
+        priority
+        sizes="(min-width: 640px) 300px, 50vw"
+        className="object-cover object-center"
+      />
+
+      <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-emerald via-emerald/30 to-transparent px-3 pb-3 pt-10">
+        <p className="font-[family-name:var(--font-great-vibes)] text-xl leading-none text-white sm:text-2xl">
+          Praise
+        </p>
+
+        <p className="mt-0.5 text-[6px] font-bold uppercase tracking-[0.18em] text-mint">
+          The Bride
+        </p>
+      </div>
 
               <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-emerald via-emerald/30 to-transparent px-3 pb-3 pt-10">
                 <p className="font-[family-name:var(--font-great-vibes)] text-xl leading-none text-white sm:text-2xl">
