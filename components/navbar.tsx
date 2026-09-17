@@ -120,9 +120,9 @@ export default function Navbar() {
           {/* Mobile Navigation */}
           <nav className="relative z-10 ml-auto flex items-center gap-1 sm:gap-1.5 md:hidden">
             <Link
-              href="/program"
+              href="/programs"
               className={`rounded-full px-2.5 py-1.5 text-[9px] font-bold uppercase tracking-[0.08em] transition-all duration-300 sm:px-3 sm:text-[10px] ${
-                pathname === '/program'
+                pathname === '/programs'
                   ? 'bg-wine text-white shadow-sm'
                   : 'bg-mint-light/90 text-wine hover:bg-mint'
               }`}
