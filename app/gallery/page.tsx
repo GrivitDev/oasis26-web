@@ -18,6 +18,7 @@ import {
   useEffect,
   useRef,
   useState,
+  type ChangeEvent,
 } from 'react';
 import { createPortal } from 'react-dom';
 import {
@@ -193,11 +194,6 @@ function GalleryPageContent() {
   return (
     <main className="min-h-screen bg-cream px-3 pb-8 pt-20 sm:px-5 sm:pb-10 sm:pt-24">
       <div className="mx-auto max-w-6xl">
-
-        {/* ===================================================== */}
-        {/* HEADER                                                  */}
-        {/* ===================================================== */}
-
         <header className="mx-auto max-w-xl text-center">
           <h1 className="font-[family-name:var(--font-cormorant)] text-3xl font-semibold leading-none text-wine sm:text-4xl">
             Our Gallery
@@ -213,38 +209,23 @@ function GalleryPageContent() {
           </p>
         </header>
 
-        {/* ===================================================== */}
-        {/* GALLERY                                                  */}
-        {/* ===================================================== */}
-
         <div className="mt-5 sm:mt-7">
           <GalleryGrid
             section={section}
             refreshKey={refreshKey}
-            onOpen={
-              setViewerItem
-            }
+            onOpen={setViewerItem}
           />
         </div>
       </div>
 
-      {/* ======================================================= */}
-      {/* FLOATING ACTION BUTTONS                                  */}
-      {/* ======================================================= */}
-
       {mounted &&
         createPortal(
-          <div
-            className="pointer-events-none fixed bottom-[calc(1.25rem+env(safe-area-inset-bottom))] right-4 z-[2147483646] flex flex-col items-center gap-2 sm:bottom-[calc(1.75rem+env(safe-area-inset-bottom))] sm:right-6"
-          >
-            {section ===
-              'live' && (
+          <div className="pointer-events-none fixed bottom-[calc(1.25rem+env(safe-area-inset-bottom))] right-4 z-[2147483646] flex flex-col items-center gap-2 sm:bottom-[calc(1.75rem+env(safe-area-inset-bottom))] sm:right-6">
+            {section === 'live' && (
               <button
                 type="button"
                 onClick={() =>
-                  setCameraOpen(
-                    true,
-                  )
+                  setCameraOpen(true)
                 }
                 className="pointer-events-auto flex h-12 w-12 items-center justify-center rounded-full border border-white/70 bg-emerald text-white shadow-[0_8px_24px_rgba(0,0,0,0.16)] backdrop-blur-md transition duration-300 hover:-translate-y-1 hover:shadow-[0_12px_30px_rgba(0,0,0,0.2)] sm:h-14 sm:w-14"
                 aria-label="Open camera"
@@ -257,23 +238,17 @@ function GalleryPageContent() {
             <button
               type="button"
               onClick={() =>
-                setUploadOpen(
-                  true,
-                )
+                setUploadOpen(true)
               }
-              disabled={
-                isUploading
-              }
+              disabled={isUploading}
               className="pointer-events-auto flex h-12 w-12 items-center justify-center rounded-full border border-white/70 bg-wine text-white shadow-[0_8px_24px_rgba(0,0,0,0.16)] backdrop-blur-md transition duration-300 hover:-translate-y-1 hover:shadow-[0_12px_30px_rgba(0,0,0,0.2)] disabled:cursor-not-allowed disabled:opacity-50 sm:h-14 sm:w-14"
               aria-label={
-                section ===
-                'pre-wedding'
+                section === 'pre-wedding'
                   ? 'Upload pre-wedding photo'
                   : 'Upload photo or video'
               }
               title={
-                section ===
-                'pre-wedding'
+                section === 'pre-wedding'
                   ? 'Upload photo'
                   : 'Upload'
               }
@@ -284,34 +259,21 @@ function GalleryPageContent() {
           document.body,
         )}
 
-      {/* ======================================================= */}
-      {/* MODALS                                                   */}
-      {/* ======================================================= */}
-
       {cameraOpen &&
-        section ===
-          'live' && (
+        section === 'live' && (
           <GalleryCamera
-            onUploaded={
-              refreshPage
-            }
+            onUploaded={refreshPage}
             onClose={() =>
-              setCameraOpen(
-                false,
-              )
+              setCameraOpen(false)
             }
           />
         )}
 
       {viewerItem && (
         <GalleryMediaViewer
-          item={
-            viewerItem
-          }
+          item={viewerItem}
           onClose={() =>
-            setViewerItem(
-              null,
-            )
+            setViewerItem(null)
           }
         />
       )}
@@ -320,26 +282,23 @@ function GalleryPageContent() {
         <GalleryUploadModal
           section={section}
           onClose={() =>
-            setUploadOpen(
-              false,
-            )
+            setUploadOpen(false)
           }
-          onStartUpload={(
-            files,
-          ) => {
-            const started =
-              startUpload(
-                section,
-                files,
-              );
+          onStartUpload={(files) => {
+            /*
+             * The upload provider owns the
+             * background queue and status bar.
+             *
+             * Start the queue first, then
+             * immediately remove this large
+             * selection modal.
+             */
+            startUpload(
+              section,
+              files,
+            );
 
-            if (started) {
-              setUploadOpen(
-                false,
-              );
-            }
-
-            return started;
+            setUploadOpen(false);
           }}
         />
       )}
@@ -361,7 +320,7 @@ type GalleryUploadModalProps = {
       id: string;
       file: File;
     }>,
-  ) => boolean;
+  ) => void;
 };
 
 function GalleryUploadModal({
@@ -536,12 +495,11 @@ function GalleryUploadModal({
   }
 
   function handleFileSelection(
-    event: React.ChangeEvent<HTMLInputElement>,
+    event: ChangeEvent<HTMLInputElement>,
   ) {
     const incomingFiles =
       Array.from(
-        event.target.files ??
-          [],
+        event.target.files ?? [],
       );
 
     event.currentTarget.value =
@@ -564,7 +522,8 @@ function GalleryUploadModal({
       setError(
         remainingSlots > 0
           ? `You can add only ${remainingSlots} more file${
-              remainingSlots === 1
+              remainingSlots ===
+              1
                 ? ''
                 : 's'
             }. The maximum is ${MAX_SELECTION_COUNT}.`
@@ -768,7 +727,7 @@ function GalleryUploadModal({
   }
 
   function handleReplaceSelection(
-    event: React.ChangeEvent<HTMLInputElement>,
+    event: ChangeEvent<HTMLInputElement>,
   ) {
     const replacement =
       event.target.files?.[0] ??
@@ -917,11 +876,6 @@ function GalleryUploadModal({
       return;
     }
 
-    /*
-     * Pre-wedding token is confirmed locally
-     * BEFORE the upload manager sends anything
-     * to the API.
-     */
     if (
       isPreWedding &&
       !isTokenValid()
@@ -935,21 +889,60 @@ function GalleryUploadModal({
       return;
     }
 
-    const started =
-      onStartUpload(
-        files.map(
-          (item) => ({
-            id: item.id,
-            file: item.file,
-          }),
-        ),
+    /*
+     * Copy only the File objects and IDs
+     * into the global upload queue.
+     *
+     * The previews belong to this modal and
+     * must not be passed to the provider.
+     */
+    const uploadFiles =
+      files.map(
+        (item) => ({
+          id: item.id,
+          file: item.file,
+        }),
       );
 
-    if (!started) {
-      setError(
-        'Another upload is already in progress. Please wait until it is complete.',
-      );
-    }
+    /*
+     * Hand the files to the global uploader.
+     *
+     * Closing the modal happens immediately
+     * after this call. The provider retains
+     * the File objects in its own queue.
+     */
+    onStartUpload(
+      uploadFiles,
+    );
+
+    /*
+     * Release the modal's preview URLs.
+     */
+    files.forEach(
+      (item) => {
+        URL.revokeObjectURL(
+          item.previewUrl,
+        );
+
+        previewUrlsRef.current.delete(
+          item.previewUrl,
+        );
+      },
+    );
+
+    setFiles([]);
+    setSelectedIds(
+      new Set(),
+    );
+    setTokenValue('');
+    setError('');
+
+    /*
+     * This is intentionally unconditional:
+     * the large selection modal must disappear
+     * immediately when Upload is clicked.
+     */
+    onClose();
   }
 
   const selectedCount =
@@ -997,11 +990,6 @@ function GalleryUploadModal({
       }}
     >
       <div className="relative my-auto w-full max-w-2xl overflow-hidden rounded-[22px] border border-sand-dark/70 bg-cream shadow-2xl sm:rounded-[26px]">
-
-        {/* ===================================================== */}
-        {/* HEADER                                                  */}
-        {/* ===================================================== */}
-
         <div className="relative overflow-hidden bg-wine px-4 pb-4 pt-4 text-white sm:px-5 sm:pb-5 sm:pt-5">
           <div className="pointer-events-none absolute -right-12 -top-12 h-28 w-28 rounded-full bg-gold/10" />
 
@@ -1024,9 +1012,7 @@ function GalleryUploadModal({
 
             <button
               type="button"
-              onClick={
-                onClose
-              }
+              onClick={onClose}
               className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-white/15 bg-white/10 text-white transition hover:bg-white/20"
               aria-label="Close upload"
             >
@@ -1035,16 +1021,7 @@ function GalleryUploadModal({
           </div>
         </div>
 
-        {/* ===================================================== */}
-        {/* CONTENT                                                 */}
-        {/* ===================================================== */}
-
         <div className="p-3.5 sm:p-4">
-
-          {/* =================================================== */}
-          {/* TOKEN                                                  */}
-          {/* =================================================== */}
-
           {isPreWedding && (
             <div className="mb-2.5 rounded-[16px] border border-sand-dark/70 bg-white p-2.5">
               <div className="flex items-center gap-2">
@@ -1065,43 +1042,29 @@ function GalleryUploadModal({
 
               <input
                 type="text"
-                value={
-                  tokenValue
-                }
-                onChange={(
-                  event,
-                ) => {
+                value={tokenValue}
+                onChange={(event) => {
                   setTokenValue(
-                    event.target
-                      .value,
+                    event.target.value,
                   );
 
                   setError('');
                 }}
                 placeholder="Private upload token"
                 autoComplete="off"
-                spellCheck={
-                  false
-                }
+                spellCheck={false}
                 className="mt-2 w-full rounded-lg border border-sand-dark/70 bg-cream px-3 py-2 text-[10px] text-ink outline-none transition placeholder:text-ink-soft/50 focus:border-wine"
               />
             </div>
           )}
 
-          {/* =================================================== */}
-          {/* SELECTION TOOLBAR                                    */}
-          {/* =================================================== */}
-
-          {files.length >
-          0 ? (
+          {files.length > 0 ? (
             <>
               <div className="mb-2.5 flex flex-wrap items-center justify-between gap-2 rounded-[15px] border border-sand-dark/70 bg-white px-2.5 py-2">
                 <div className="min-w-0">
                   <p className="text-[8px] font-bold uppercase tracking-[0.1em] text-wine">
                     {files.length} /{' '}
-                    {
-                      MAX_SELECTION_COUNT
-                    }{' '}
+                    {MAX_SELECTION_COUNT}{' '}
                     selected
                   </p>
 
@@ -1114,9 +1077,7 @@ function GalleryUploadModal({
                   {!allSelected && (
                     <button
                       type="button"
-                      onClick={
-                        selectAll
-                      }
+                      onClick={selectAll}
                       className="rounded-full border border-sand-dark/70 bg-cream px-2 py-1.5 text-[7px] font-bold uppercase tracking-[0.08em] text-ink-soft transition hover:bg-sand"
                     >
                       Select all
@@ -1126,9 +1087,7 @@ function GalleryUploadModal({
                   {allSelected && (
                     <button
                       type="button"
-                      onClick={
-                        clearSelection
-                      }
+                      onClick={clearSelection}
                       className="rounded-full border border-sand-dark/70 bg-cream px-2 py-1.5 text-[7px] font-bold uppercase tracking-[0.08em] text-ink-soft transition hover:bg-sand"
                     >
                       Clear
@@ -1145,18 +1104,11 @@ function GalleryUploadModal({
                       className="inline-flex items-center gap-1 rounded-full bg-wine px-2 py-1.5 text-[7px] font-bold uppercase tracking-[0.08em] text-white transition hover:bg-wine/90"
                     >
                       <Trash2 className="h-2.5 w-2.5" />
-                      Remove{' '}
-                      {
-                        selectedCount
-                      }
+                      Remove {selectedCount}
                     </button>
                   )}
                 </div>
               </div>
-
-              {/* ================================================= */}
-              {/* PREVIEW GRID                                       */}
-              {/* ================================================= */}
 
               <div className="max-h-[54vh] overflow-y-auto rounded-[18px] border border-sand-dark/70 bg-white p-2.5 sm:p-3">
                 <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
@@ -1174,9 +1126,7 @@ function GalleryUploadModal({
 
                       return (
                         <div
-                          key={
-                            item.id
-                          }
+                          key={item.id}
                           className={`group relative overflow-hidden rounded-[14px] border bg-white transition ${
                             checked
                               ? 'border-wine ring-2 ring-wine/15'
@@ -1200,8 +1150,7 @@ function GalleryUploadModal({
                                   item.previewUrl
                                 }
                                 alt={
-                                  item
-                                    .file
+                                  item.file
                                     .name
                                 }
                                 fill
@@ -1250,16 +1199,14 @@ function GalleryUploadModal({
                           <div className="p-2">
                             <p className="truncate text-[8px] font-semibold text-ink">
                               {
-                                item
-                                  .file
+                                item.file
                                   .name
                               }
                             </p>
 
                             <p className="mt-0.5 text-[7px] text-ink-soft">
                               {formatFileSize(
-                                item
-                                  .file
+                                item.file
                                   .size,
                               )}
                             </p>
@@ -1285,14 +1232,8 @@ function GalleryUploadModal({
               </div>
             </>
           ) : (
-            /* ================================================= */
-            /* EMPTY SELECTION                                   */
-            /* ================================================= */
-
             <label
-              onClick={
-                openFilePicker
-              }
+              onClick={openFilePicker}
               className="group flex min-h-48 cursor-pointer flex-col items-center justify-center rounded-[18px] border border-dashed border-sand-dark/80 bg-white px-4 py-8 text-center transition hover:border-wine/50 hover:bg-white/80"
             >
               <span className="flex h-10 w-10 items-center justify-center rounded-full bg-wine/10 text-wine transition group-hover:scale-105">
@@ -1317,14 +1258,8 @@ function GalleryUploadModal({
             </label>
           )}
 
-          {/* =================================================== */}
-          {/* FILE INPUTS                                           */}
-          {/* =================================================== */}
-
           <input
-            ref={
-              fileInputRef
-            }
+            ref={fileInputRef}
             type="file"
             multiple
             accept={
@@ -1339,9 +1274,7 @@ function GalleryUploadModal({
           />
 
           <input
-            ref={
-              replaceInputRef
-            }
+            ref={replaceInputRef}
             type="file"
             accept={
               isPreWedding
@@ -1354,18 +1287,11 @@ function GalleryUploadModal({
             className="sr-only"
           />
 
-          {/* =================================================== */}
-          {/* ADD MORE                                             */}
-          {/* =================================================== */}
-
-          {files.length >
-            0 && (
+          {files.length > 0 && (
             <div className="mt-2.5 flex items-center justify-between gap-2">
               <button
                 type="button"
-                onClick={
-                  clearFiles
-                }
+                onClick={clearFiles}
                 className="inline-flex items-center gap-1 rounded-full border border-sand-dark/70 bg-white px-2.5 py-1.5 text-[7px] font-bold uppercase tracking-[0.08em] text-ink-soft transition hover:bg-sand"
               >
                 <Trash2 className="h-2.5 w-2.5" />
@@ -1375,9 +1301,7 @@ function GalleryUploadModal({
               {canAddMore ? (
                 <button
                   type="button"
-                  onClick={
-                    openFilePicker
-                  }
+                  onClick={openFilePicker}
                   className="inline-flex items-center gap-1 rounded-full border border-wine/30 bg-wine/5 px-2.5 py-1.5 text-[7px] font-bold uppercase tracking-[0.08em] text-wine transition hover:bg-wine/10"
                 >
                   <Upload className="h-2.5 w-2.5" />
@@ -1391,10 +1315,6 @@ function GalleryUploadModal({
             </div>
           )}
 
-          {/* =================================================== */}
-          {/* ERROR                                                 */}
-          {/* =================================================== */}
-
           {error && (
             <div className="mt-2.5 rounded-[14px] bg-wine/5 px-3 py-2">
               <p className="text-[8px] leading-3.5 text-wine">
@@ -1403,16 +1323,10 @@ function GalleryUploadModal({
             </div>
           )}
 
-          {/* =================================================== */}
-          {/* FOOTER                                                */}
-          {/* =================================================== */}
-
           <div className="mt-3 flex gap-1.5">
             <button
               type="button"
-              onClick={
-                onClose
-              }
+              onClick={onClose}
               className="flex-1 rounded-full border border-sand-dark/70 bg-white px-2 py-2.5 text-[8px] font-bold uppercase tracking-[0.1em] text-ink-soft transition hover:bg-sand"
             >
               Cancel
@@ -1420,9 +1334,7 @@ function GalleryUploadModal({
 
             <button
               type="button"
-              onClick={
-                upload
-              }
+              onClick={upload}
               disabled={
                 files.length ===
                   0 ||
@@ -1434,19 +1346,13 @@ function GalleryUploadModal({
               <Check className="h-3 w-3" />
 
               {isPreWedding
-                ? `Upload ${
-                    files.length
-                  } ${
-                    files.length ===
-                    1
+                ? `Upload ${files.length} ${
+                    files.length === 1
                       ? 'Photograph'
                       : 'Photographs'
                   }`
-                : `Upload ${
-                    files.length
-                  } ${
-                    files.length ===
-                    1
+                : `Upload ${files.length} ${
+                    files.length === 1
                       ? 'Memory'
                       : 'Memories'
                   }`}
