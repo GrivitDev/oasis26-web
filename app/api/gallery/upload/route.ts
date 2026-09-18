@@ -30,9 +30,6 @@ const CLOUDINARY_FOLDER_PREFIX =
 const CLOUDINARY_LOGO_PUBLIC_ID =
   'oasis26/branding/logo';
 
-const COMPLETION_TOKEN_TTL_MS =
-  10 * 60 * 1000;
-
 let logoPublicIdPromise:
   | Promise<string>
   | null = null;
@@ -80,90 +77,6 @@ function formatMegabytes(
   return `${Math.round(
     bytes / 1024 / 1024,
   )} MB`;
-}
-
-function isValidPreWeddingToken(
-  token: unknown,
-): boolean {
-  const configuredToken =
-    process.env.PREWEDDING_UPLOAD_TOKEN;
-
-  console.log(
-    '[Gallery Upload] Token check:',
-    {
-      receivedType: typeof token,
-      receivedLength:
-        typeof token === 'string'
-          ? token.length
-          : null,
-      configured:
-        typeof configuredToken === 'string',
-      configuredLength:
-        typeof configuredToken === 'string'
-          ? configuredToken.length
-          : null,
-    },
-  );
-
-  if (
-    typeof token !== 'string' ||
-    typeof configuredToken !== 'string'
-  ) {
-    return false;
-  }
-
-  const suppliedToken =
-    token.trim();
-
-  const expectedToken =
-    configuredToken.trim();
-
-  console.log(
-    '[Gallery Upload] Token comparison:',
-    {
-      suppliedLength:
-        suppliedToken.length,
-      expectedLength:
-        expectedToken.length,
-      lengthsMatch:
-        suppliedToken.length ===
-        expectedToken.length,
-      exactMatch:
-        suppliedToken ===
-        expectedToken,
-    },
-  );
-
-  if (
-    !suppliedToken ||
-    !expectedToken
-  ) {
-    return false;
-  }
-
-  const suppliedBuffer =
-    Buffer.from(
-      suppliedToken,
-      'utf8',
-    );
-
-  const expectedBuffer =
-    Buffer.from(
-      expectedToken,
-      'utf8',
-    );
-
-  if (
-    suppliedBuffer.length !==
-    expectedBuffer.length
-  ) {
-    return false;
-  }
-
-  return crypto.timingSafeEqual(
-    suppliedBuffer,
-    expectedBuffer,
-  );
 }
 
 /* ============================================================= */
@@ -311,15 +224,8 @@ function createBrandedImageUrl(
 }
 
 /* ============================================================= */
-/* COMPLETION TOKEN                                               */
+/* CLOUDINARY API SECRET                                          */
 /* ============================================================= */
-
-type CompletionTokenPayload = {
-  section: GallerySection;
-  resourceType: GalleryMediaType;
-  publicId: string;
-  expiresAt: number;
-};
 
 function getCloudinaryApiSecret(): string {
   const apiSecret =
@@ -334,166 +240,6 @@ function getCloudinaryApiSecret(): string {
   return apiSecret;
 }
 
-function createCompletionToken(
-  payload: Omit<
-    CompletionTokenPayload,
-    'expiresAt'
-  >,
-): string {
-  const completePayload: CompletionTokenPayload =
-    {
-      ...payload,
-      expiresAt:
-        Date.now() +
-        COMPLETION_TOKEN_TTL_MS,
-    };
-
-  const encodedPayload =
-    Buffer.from(
-      JSON.stringify(
-        completePayload,
-      ),
-    ).toString('base64url');
-
-  const signature =
-    crypto
-      .createHmac(
-        'sha256',
-        getCloudinaryApiSecret(),
-      )
-      .update(encodedPayload)
-      .digest('base64url');
-
-  return `${encodedPayload}.${signature}`;
-}
-
-function verifyCompletionToken(
-  token: unknown,
-  expected: {
-    section: GallerySection;
-    resourceType: GalleryMediaType;
-    publicId: string;
-  },
-): boolean {
-  if (
-    typeof token !== 'string'
-  ) {
-    return false;
-  }
-
-  const separatorIndex =
-    token.lastIndexOf('.');
-
-  if (
-    separatorIndex <= 0 ||
-    separatorIndex ===
-      token.length - 1
-  ) {
-    return false;
-  }
-
-  const encodedPayload =
-    token.slice(
-      0,
-      separatorIndex,
-    );
-
-  const suppliedSignature =
-    token.slice(
-      separatorIndex + 1,
-    );
-
-  let expectedSignature: string;
-
-  try {
-    expectedSignature =
-      crypto
-        .createHmac(
-          'sha256',
-          getCloudinaryApiSecret(),
-        )
-        .update(encodedPayload)
-        .digest('base64url');
-  } catch {
-    return false;
-  }
-
-  const suppliedSignatureBuffer =
-    Buffer.from(
-      suppliedSignature,
-    );
-
-  const expectedSignatureBuffer =
-    Buffer.from(
-      expectedSignature,
-    );
-
-  if (
-    suppliedSignatureBuffer.length !==
-    expectedSignatureBuffer.length
-  ) {
-    return false;
-  }
-
-  if (
-    !crypto.timingSafeEqual(
-      suppliedSignatureBuffer,
-      expectedSignatureBuffer,
-    )
-  ) {
-    return false;
-  }
-
-  try {
-    const payload =
-      JSON.parse(
-        Buffer.from(
-          encodedPayload,
-          'base64url',
-        ).toString('utf8'),
-      ) as Partial<CompletionTokenPayload>;
-
-    if (
-      payload.section !==
-      expected.section
-    ) {
-      return false;
-    }
-
-    if (
-      payload.resourceType !==
-      expected.resourceType
-    ) {
-      return false;
-    }
-
-    if (
-      payload.publicId !==
-      expected.publicId
-    ) {
-      return false;
-    }
-
-    if (
-      typeof payload.expiresAt !==
-      'number'
-    ) {
-      return false;
-    }
-
-    if (
-      payload.expiresAt <=
-      Date.now()
-    ) {
-      return false;
-    }
-
-    return true;
-  } catch {
-    return false;
-  }
-}
-
 /* ============================================================= */
 /* UPLOAD SIGNATURE                                               */
 /* ============================================================= */
@@ -506,7 +252,6 @@ type UploadSignatureResponse = {
   folder: string;
   publicId: string;
   resourceType: GalleryMediaType;
-  completionToken: string;
 };
 
 async function createUploadSignature(
@@ -520,12 +265,11 @@ async function createUploadSignature(
     process.env.CLOUDINARY_API_KEY;
 
   const apiSecret =
-    process.env.CLOUDINARY_API_SECRET;
+    getCloudinaryApiSecret();
 
   if (
     !cloudName ||
-    !apiKey ||
-    !apiSecret
+    !apiKey
   ) {
     throw new Error(
       'Missing Cloudinary environment variables.',
@@ -571,13 +315,6 @@ async function createUploadSignature(
       apiSecret,
     );
 
-  const completionToken =
-    createCompletionToken({
-      section,
-      resourceType,
-      publicId,
-    });
-
   return {
     cloudName,
     apiKey,
@@ -586,7 +323,6 @@ async function createUploadSignature(
     folder,
     publicId,
     resourceType,
-    completionToken,
   };
 }
 
@@ -615,9 +351,6 @@ export async function POST(
       const resourceType =
         body?.resourceType;
 
-      const token =
-        body?.token;
-
       if (
         !isValidSection(section)
       ) {
@@ -645,39 +378,24 @@ export async function POST(
       }
 
       /*
-       * Pre-wedding uploads are private
-       * and photograph-only.
+       * Pre-wedding gallery accepts photographs
+       * only.
+       *
+       * No token or password is required.
        */
       if (
         section ===
-        GALLERY_SECTIONS.PRE_WEDDING
-      ) {
-        if (
-          !isValidPreWeddingToken(
-            token,
-          )
-        ) {
-          return NextResponse.json(
-            {
-              error:
-                'Invalid pre-wedding upload token.',
-            },
-            { status: 403 },
-          );
-        }
-
-        if (
-          resourceType ===
+          GALLERY_SECTIONS.PRE_WEDDING &&
+        resourceType ===
           GALLERY_MEDIA_TYPES.VIDEO
-        ) {
-          return NextResponse.json(
-            {
-              error:
-                'Videos are not allowed in the pre-wedding gallery.',
-            },
-            { status: 400 },
-          );
-        }
+      ) {
+        return NextResponse.json(
+          {
+            error:
+              'Videos are not allowed in the pre-wedding gallery.',
+          },
+          { status: 400 },
+        );
       }
 
       const signature =
@@ -698,9 +416,6 @@ export async function POST(
     if (action === 'complete') {
       const section =
         body?.section;
-
-      const completionToken =
-        body?.completionToken;
 
       const publicId =
         body?.publicId;
@@ -777,7 +492,7 @@ export async function POST(
 
       if (
         typeof originalFilename !==
-        'string' ||
+          'string' ||
         !originalFilename.trim()
       ) {
         return NextResponse.json(
@@ -786,35 +501,6 @@ export async function POST(
               'Original filename is required.',
           },
           { status: 400 },
-        );
-      }
-
-      /*
-       * The completion token is bound to:
-       *
-       * - section
-       * - resource type
-       * - exact Cloudinary public ID
-       *
-       * Therefore a valid completion token
-       * cannot be reused for another asset.
-       */
-      if (
-        !verifyCompletionToken(
-          completionToken,
-          {
-            section,
-            resourceType,
-            publicId,
-          },
-        )
-      ) {
-        return NextResponse.json(
-          {
-            error:
-              'Invalid or expired upload completion token.',
-          },
-          { status: 403 },
         );
       }
 
@@ -842,7 +528,7 @@ export async function POST(
        */
       if (
         section ===
-        GALLERY_SECTIONS.PRE_WEDDING &&
+          GALLERY_SECTIONS.PRE_WEDDING &&
         resourceType ===
           GALLERY_MEDIA_TYPES.VIDEO
       ) {
@@ -910,7 +596,8 @@ export async function POST(
       }
 
       if (
-        verifiedBytes > maxSize
+        verifiedBytes >
+        maxSize
       ) {
         /*
          * Delete the oversized asset so

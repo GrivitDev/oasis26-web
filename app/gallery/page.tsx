@@ -6,7 +6,6 @@ import Image from 'next/image';
 import {
   Camera,
   Check,
-  LockKeyhole,
   Upload,
   X,
 } from 'lucide-react';
@@ -17,7 +16,10 @@ import {
   useState,
 } from 'react';
 import { createPortal } from 'react-dom';
-import { useRouter, useSearchParams } from 'next/navigation';
+import {
+  useRouter,
+  useSearchParams,
+} from 'next/navigation';
 
 import GalleryCamera from '@/components/gallery/gallery-camera';
 import GalleryGrid from '@/components/gallery/gallery-grid';
@@ -126,7 +128,7 @@ function GalleryPageContent() {
       <div className="mx-auto max-w-6xl">
 
         {/* ===================================================== */}
-        {/* HEADER */}
+        {/* HEADER                                                  */}
         {/* ===================================================== */}
 
         <header className="mx-auto max-w-xl text-center">
@@ -145,7 +147,7 @@ function GalleryPageContent() {
         </header>
 
         {/* ===================================================== */}
-        {/* GALLERY */}
+        {/* GALLERY                                                  */}
         {/* ===================================================== */}
 
         <div className="mt-5 sm:mt-7">
@@ -158,7 +160,7 @@ function GalleryPageContent() {
       </div>
 
       {/* ======================================================= */}
-      {/* FLOATING ACTION BUTTONS */}
+      {/* FLOATING ACTION BUTTONS                                  */}
       {/* ======================================================= */}
 
       {mounted &&
@@ -204,7 +206,7 @@ function GalleryPageContent() {
         )}
 
       {/* ======================================================= */}
-      {/* MODALS */}
+      {/* MODALS                                                   */}
       {/* ======================================================= */}
 
       {cameraOpen &&
@@ -266,7 +268,6 @@ type UploadSignatureResponse = {
   resourceType:
     | 'image'
     | 'video';
-  completionToken: string;
 };
 
 type CloudinaryUploadResponse = {
@@ -290,9 +291,6 @@ function GalleryUploadModal({
 
   const [file, setFile] =
     useState<File | null>(null);
-
-  const [token, setToken] =
-    useState('');
 
   const [previewUrl, setPreviewUrl] =
     useState('');
@@ -373,6 +371,7 @@ function GalleryUploadModal({
       setError('');
       setProgress(0);
       setProcessing(false);
+
       return;
     }
 
@@ -392,6 +391,7 @@ function GalleryUploadModal({
       );
       setProgress(0);
       setProcessing(false);
+
       return;
     }
 
@@ -409,6 +409,7 @@ function GalleryUploadModal({
       );
       setProgress(0);
       setProcessing(false);
+
       return;
     }
 
@@ -425,6 +426,7 @@ function GalleryUploadModal({
       );
       setProgress(0);
       setProcessing(false);
+
       return;
     }
 
@@ -446,6 +448,7 @@ function GalleryUploadModal({
       );
       setProgress(0);
       setProcessing(false);
+
       return;
     }
 
@@ -502,9 +505,6 @@ function GalleryUploadModal({
             action: 'sign',
             section,
             resourceType,
-            token: isPreWedding
-              ? token.trim()
-              : undefined,
           }),
         },
       );
@@ -702,7 +702,6 @@ function GalleryUploadModal({
   }
 
   async function completeGalleryUpload(
-    uploadSignature: UploadSignatureResponse,
     cloudinaryResult: CloudinaryUploadResponse,
   ) {
     const response =
@@ -717,8 +716,6 @@ function GalleryUploadModal({
           body: JSON.stringify({
             action: 'complete',
             section,
-            completionToken:
-              uploadSignature.completionToken,
             publicId:
               cloudinaryResult.public_id,
             secureUrl:
@@ -769,17 +766,6 @@ function GalleryUploadModal({
         isPreWedding
           ? 'Please select a photograph.'
           : 'Please select a photo or video.',
-      );
-
-      return;
-    }
-
-    if (
-      isPreWedding &&
-      !token.trim()
-    ) {
-      setError(
-        'Please enter the private upload token.',
       );
 
       return;
@@ -864,7 +850,6 @@ function GalleryUploadModal({
       setProcessing(true);
 
       await completeGalleryUpload(
-        uploadSignature,
         cloudinaryResult,
       );
 
@@ -1072,41 +1057,6 @@ function GalleryUploadModal({
             </div>
           )}
 
-          {isPreWedding && (
-            <div className="mt-2.5 rounded-[16px] border border-sand-dark/70 bg-white p-2.5">
-              <div className="flex items-center gap-2">
-                <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-wine/10 text-wine">
-                  <LockKeyhole className="h-3 w-3" />
-                </div>
-
-                <div className="min-w-0">
-                  <p className="text-[8px] font-bold uppercase tracking-[0.12em] text-wine">
-                    Private upload
-                  </p>
-
-                  <p className="mt-0.5 text-[8px] leading-3.5 text-ink-soft">
-                    Enter the private token to continue.
-                  </p>
-                </div>
-              </div>
-
-              <input
-                type="text"
-                value={token}
-                disabled={uploading}
-                onChange={(event) => {
-                  setToken(
-                    event.target.value,
-                  );
-
-                  setError('');
-                }}
-                placeholder="Private upload token"
-                className="mt-2 w-full rounded-lg border border-sand-dark/70 bg-cream px-3 py-2 text-[10px] text-ink outline-none transition placeholder:text-ink-soft/50 focus:border-wine"
-              />
-            </div>
-          )}
-
           {uploading && (
             <div className="mt-2.5 rounded-[16px] border border-sand-dark/70 bg-white p-2.5">
               <div className="flex items-center justify-between text-[8px] font-semibold text-ink-soft">
@@ -1170,9 +1120,7 @@ function GalleryUploadModal({
               onClick={upload}
               disabled={
                 uploading ||
-                !file ||
-                (isPreWedding &&
-                  !token.trim())
+                !file
               }
               className="flex flex-[1.5] items-center justify-center gap-1 rounded-full bg-wine px-2 py-2.5 text-[8px] font-bold uppercase tracking-[0.1em] text-white shadow-sm transition hover:bg-wine/90 disabled:cursor-not-allowed disabled:opacity-35"
             >
