@@ -1,13 +1,25 @@
+// src/app/api/blessings/route.ts
+
 import { NextResponse } from 'next/server';
 import { ObjectId } from 'mongodb';
 
 import clientPromise from '@/lib/mongodb';
 
-const COLLECTION_NAME = 'blessings_prayers';
+const COLLECTION_NAME =
+  'blessings_prayers';
 
-export async function GET(request: Request) {
+export const runtime = 'nodejs';
+
+/* ============================================================= */
+/* GET                                                             */
+/* ============================================================= */
+
+export async function GET(
+  request: Request,
+) {
   try {
-    const { searchParams } = new URL(request.url);
+    const { searchParams } =
+      new URL(request.url);
 
     const requestedLimit = Number(
       searchParams.get('limit') ?? '10',
@@ -24,37 +36,63 @@ export async function GET(request: Request) {
     );
 
     const beforeCreatedAt =
-      searchParams.get('beforeCreatedAt');
+      searchParams.get(
+        'beforeCreatedAt',
+      );
 
     const beforeId =
       searchParams.get('beforeId');
 
-    const client = await clientPromise;
-    const db = client.db();
+    const client =
+      await clientPromise;
 
-    const query: Record<string, unknown> = {};
+    const db = client.db(
+      process.env.MONGODB_DB,
+    );
 
-    if (beforeCreatedAt || beforeId) {
-      if (!beforeCreatedAt || !beforeId) {
+    const query: Record<
+      string,
+      unknown
+    > = {};
+
+    /* ========================================================= */
+    /* PAGINATION                                                  */
+    /* ========================================================= */
+
+    if (
+      beforeCreatedAt ||
+      beforeId
+    ) {
+      if (
+        !beforeCreatedAt ||
+        !beforeId
+      ) {
         return NextResponse.json(
           {
-            error: 'Invalid pagination cursor.',
+            error:
+              'Invalid pagination cursor.',
           },
           { status: 400 },
         );
       }
 
-      const cursorDate = new Date(
-        beforeCreatedAt,
-      );
+      const cursorDate =
+        new Date(
+          beforeCreatedAt,
+        );
 
       if (
-        Number.isNaN(cursorDate.getTime()) ||
-        !ObjectId.isValid(beforeId)
+        Number.isNaN(
+          cursorDate.getTime(),
+        ) ||
+        !ObjectId.isValid(
+          beforeId,
+        )
       ) {
         return NextResponse.json(
           {
-            error: 'Invalid pagination cursor.',
+            error:
+              'Invalid pagination cursor.',
           },
           { status: 400 },
         );
@@ -69,67 +107,100 @@ export async function GET(request: Request) {
         {
           createdAt: cursorDate,
           _id: {
-            $lt: new ObjectId(beforeId),
+            $lt: new ObjectId(
+              beforeId,
+            ),
           },
         },
       ];
     }
 
-    const entries = await db
-      .collection(COLLECTION_NAME)
-      .find(query, {
-        projection: {
-          name: 1,
-          message: 1,
-          createdAt: 1,
-        },
-      })
-      .sort({
-        createdAt: -1,
-        _id: -1,
-      })
-      .limit(limit + 1)
-      .toArray();
+    /* ========================================================= */
+    /* FETCH                                                        */
+    /* ========================================================= */
 
-    const hasMore = entries.length > limit;
+    const entries =
+      await db
+        .collection(
+          COLLECTION_NAME,
+        )
+        .find(query, {
+          projection: {
+            name: 1,
+            message: 1,
+            createdAt: 1,
+          },
+        })
+        .sort({
+          createdAt: -1,
+          _id: -1,
+        })
+        .limit(limit + 1)
+        .toArray();
 
-    const pageEntries = hasMore
-      ? entries.slice(0, limit)
-      : entries;
+    const hasMore =
+      entries.length > limit;
 
-    const mappedEntries = pageEntries.map(
-      (entry) => ({
-        id: entry._id.toString(),
-        name: entry.name,
-        message: entry.message,
-        createdAt:
-          entry.createdAt instanceof Date
-            ? entry.createdAt.toISOString()
-            : entry.createdAt,
-      }),
-    );
+    const pageEntries =
+      hasMore
+        ? entries.slice(0, limit)
+        : entries;
+
+    /* ========================================================= */
+    /* RESPONSE                                                     */
+    /* ========================================================= */
+
+    const mappedEntries =
+      pageEntries.map(
+        (entry) => ({
+          id: entry._id.toString(),
+          name: entry.name,
+          message: entry.message,
+          createdAt:
+            entry.createdAt instanceof
+            Date
+              ? entry.createdAt.toISOString()
+              : new Date(
+                  entry.createdAt,
+                ).toISOString(),
+        }),
+      );
 
     const lastEntry =
-      pageEntries[pageEntries.length - 1];
+      pageEntries[
+        pageEntries.length - 1
+      ];
 
     const nextCursor =
       lastEntry && hasMore
         ? {
             beforeCreatedAt:
-              lastEntry.createdAt instanceof Date
+              lastEntry.createdAt instanceof
+              Date
                 ? lastEntry.createdAt.toISOString()
                 : new Date(
                     lastEntry.createdAt,
                   ).toISOString(),
-            beforeId: lastEntry._id.toString(),
+
+            beforeId:
+              lastEntry._id.toString(),
           }
         : null;
 
-    return NextResponse.json({
-      entries: mappedEntries,
-      hasMore,
-      nextCursor,
-    });
+    return NextResponse.json(
+      {
+        entries:
+          mappedEntries,
+        hasMore,
+        nextCursor,
+      },
+      {
+        headers: {
+          'Cache-Control':
+            'no-store, no-cache, must-revalidate',
+        },
+      },
+    );
   } catch (error) {
     console.error(
       'Failed to fetch blessings and prayers:',
@@ -146,23 +217,37 @@ export async function GET(request: Request) {
   }
 }
 
+/* ============================================================= */
+/* POST                                                            */
+/* ============================================================= */
+
 export async function POST(
   request: Request,
 ) {
   try {
-    const body = await request.json();
+    const body =
+      await request.json();
 
     const name =
-      typeof body.name === 'string'
+      typeof body.name ===
+      'string'
         ? body.name.trim()
         : '';
 
     const message =
-      typeof body.message === 'string'
+      typeof body.message ===
+      'string'
         ? body.message.trim()
         : '';
 
-    if (!name || !message) {
+    /* ========================================================= */
+    /* VALIDATION                                                  */
+    /* ========================================================= */
+
+    if (
+      !name ||
+      !message
+    ) {
       return NextResponse.json(
         {
           error:
@@ -172,7 +257,9 @@ export async function POST(
       );
     }
 
-    if (name.length > 120) {
+    if (
+      name.length > 120
+    ) {
       return NextResponse.json(
         {
           error:
@@ -182,7 +269,9 @@ export async function POST(
       );
     }
 
-    if (message.length > 2000) {
+    if (
+      message.length > 2000
+    ) {
       return NextResponse.json(
         {
           error:
@@ -192,18 +281,34 @@ export async function POST(
       );
     }
 
-        const client = await clientPromise;
-        const db = client.db(process.env.MONGODB_DB);
+    /* ========================================================= */
+    /* DATABASE                                                    */
+    /* ========================================================= */
 
-    const createdAt = new Date();
+    const client =
+      await clientPromise;
 
-    const result = await db
-      .collection(COLLECTION_NAME)
-      .insertOne({
-        name,
-        message,
-        createdAt,
-      });
+    const db = client.db(
+      process.env.MONGODB_DB,
+    );
+
+    const createdAt =
+      new Date();
+
+    const result =
+      await db
+        .collection(
+          COLLECTION_NAME,
+        )
+        .insertOne({
+          name,
+          message,
+          createdAt,
+        });
+
+    /* ========================================================= */
+    /* RESPONSE                                                     */
+    /* ========================================================= */
 
     return NextResponse.json(
       {
@@ -211,7 +316,8 @@ export async function POST(
           id: result.insertedId.toString(),
           name,
           message,
-          createdAt: createdAt.toISOString(),
+          createdAt:
+            createdAt.toISOString(),
         },
       },
       { status: 201 },

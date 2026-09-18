@@ -1091,7 +1091,7 @@ function GalleryUploadModal({
               </div>
 
               <input
-                type="password"
+                type="text"
                 value={token}
                 disabled={uploading}
                 onChange={(event) => {

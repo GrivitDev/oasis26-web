@@ -85,21 +85,73 @@ function formatMegabytes(
 function isValidPreWeddingToken(
   token: unknown,
 ): boolean {
-  const expectedToken =
+  const configuredToken =
     process.env.PREWEDDING_UPLOAD_TOKEN;
+
+  console.log(
+    '[Gallery Upload] Token check:',
+    {
+      receivedType: typeof token,
+      receivedLength:
+        typeof token === 'string'
+          ? token.length
+          : null,
+      configured:
+        typeof configuredToken === 'string',
+      configuredLength:
+        typeof configuredToken === 'string'
+          ? configuredToken.length
+          : null,
+    },
+  );
 
   if (
     typeof token !== 'string' ||
+    typeof configuredToken !== 'string'
+  ) {
+    return false;
+  }
+
+  const suppliedToken =
+    token.trim();
+
+  const expectedToken =
+    configuredToken.trim();
+
+  console.log(
+    '[Gallery Upload] Token comparison:',
+    {
+      suppliedLength:
+        suppliedToken.length,
+      expectedLength:
+        expectedToken.length,
+      lengthsMatch:
+        suppliedToken.length ===
+        expectedToken.length,
+      exactMatch:
+        suppliedToken ===
+        expectedToken,
+    },
+  );
+
+  if (
+    !suppliedToken ||
     !expectedToken
   ) {
     return false;
   }
 
   const suppliedBuffer =
-    Buffer.from(token);
+    Buffer.from(
+      suppliedToken,
+      'utf8',
+    );
 
   const expectedBuffer =
-    Buffer.from(expectedToken);
+    Buffer.from(
+      expectedToken,
+      'utf8',
+    );
 
   if (
     suppliedBuffer.length !==
