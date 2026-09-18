@@ -419,7 +419,7 @@ function GalleryUploadStatusBar({
         : `${completedCount} of ${items.length} completed`;
 
   return (
-    <div className="pointer-events-none fixed left-1/2 top-[calc(0.75rem+env(safe-area-inset-top))] z-[2147483647] w-[calc(100%-1rem)] max-w-lg -translate-x-1/2 sm:top-4">
+    <div className="pointer-events-none fixed left-3 top-[calc(4.5rem+env(safe-area-inset-top))] z-[2147483647] w-[calc(100%-1.5rem)] max-w-lg sm:left-5 sm:top-[5.25rem] sm:w-[calc(100%-2.5rem)]">
       <div className="pointer-events-auto overflow-hidden rounded-[18px] border border-sand-dark/70 bg-cream shadow-[0_12px_40px_rgba(0,0,0,0.18)] backdrop-blur-xl">
 
         {/* MAIN BAR */}
@@ -777,11 +777,6 @@ export function GalleryUploadProvider({
             ? error.message
             : 'Unable to upload this file.';
 
-        /*
-         * Count a failed item as finished in
-         * the overall queue so the queue can
-         * complete even when one file fails.
-         */
         completedBytes +=
           queueItem.file.size;
 
@@ -807,10 +802,6 @@ export function GalleryUploadProvider({
         );
       }
 
-      /*
-       * Keep the latest completed count
-       * available while the queue runs.
-       */
       void completedCount;
     }
 
