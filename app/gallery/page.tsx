@@ -6,6 +6,7 @@ import Image from 'next/image';
 import {
   Camera,
   Check,
+  LockKeyhole,
   Upload,
   X,
 } from 'lucide-react';
@@ -51,6 +52,10 @@ const ALLOWED_VIDEO_TYPES =
     'video/webm',
     'video/quicktime',
   ]);
+
+const PREWEDDING_UPLOAD_TOKEN =
+  process.env
+    .NEXT_PUBLIC_PREWEDDING_UPLOAD_TOKEN?.trim() ?? '';
 
 export default function GalleryPage() {
   return (
@@ -292,6 +297,9 @@ function GalleryUploadModal({
   const [file, setFile] =
     useState<File | null>(null);
 
+  const [token, setToken] =
+    useState('');
+
   const [previewUrl, setPreviewUrl] =
     useState('');
 
@@ -485,6 +493,22 @@ function GalleryUploadModal({
     setError('');
     setProgress(0);
     setProcessing(false);
+  }
+
+  function isTokenValid(): boolean {
+    if (!isPreWedding) {
+      return true;
+    }
+
+    const suppliedToken =
+      token.trim();
+
+    return (
+      suppliedToken.length > 0 &&
+      PREWEDDING_UPLOAD_TOKEN.length > 0 &&
+      suppliedToken ===
+        PREWEDDING_UPLOAD_TOKEN
+    );
   }
 
   async function requestUploadSignature(
@@ -771,6 +795,23 @@ function GalleryUploadModal({
       return;
     }
 
+    /*
+     * The pre-wedding token is confirmed locally
+     * before ANY request is sent to the API route.
+     */
+    if (
+      isPreWedding &&
+      !isTokenValid()
+    ) {
+      setError(
+        PREWEDDING_UPLOAD_TOKEN
+          ? 'Invalid pre-wedding upload token.'
+          : 'The pre-wedding upload token is not configured.',
+      );
+
+      return;
+    }
+
     const isVideo =
       file.type.startsWith(
         'video/',
@@ -821,9 +862,9 @@ function GalleryUploadModal({
       /*
        * STEP 1
        *
-       * Send only a tiny JSON request to Vercel.
+       * The token has already been confirmed locally.
        *
-       * The actual file does NOT go to Vercel.
+       * The token itself is NOT sent to the route.
        */
       const uploadSignature =
         await requestUploadSignature(
@@ -1057,6 +1098,43 @@ function GalleryUploadModal({
             </div>
           )}
 
+          {isPreWedding && (
+            <div className="mt-2.5 rounded-[16px] border border-sand-dark/70 bg-white p-2.5">
+              <div className="flex items-center gap-2">
+                <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-wine/10 text-wine">
+                  <LockKeyhole className="h-3 w-3" />
+                </div>
+
+                <div className="min-w-0">
+                  <p className="text-[8px] font-bold uppercase tracking-[0.12em] text-wine">
+                    Private upload
+                  </p>
+
+                  <p className="mt-0.5 text-[8px] leading-3.5 text-ink-soft">
+                    Enter the upload token to continue.
+                  </p>
+                </div>
+              </div>
+
+              <input
+                type="text"
+                value={token}
+                disabled={uploading}
+                onChange={(event) => {
+                  setToken(
+                    event.target.value,
+                  );
+
+                  setError('');
+                }}
+                placeholder="Private upload token"
+                autoComplete="off"
+                spellCheck={false}
+                className="mt-2 w-full rounded-lg border border-sand-dark/70 bg-cream px-3 py-2 text-[10px] text-ink outline-none transition placeholder:text-ink-soft/50 focus:border-wine"
+              />
+            </div>
+          )}
+
           {uploading && (
             <div className="mt-2.5 rounded-[16px] border border-sand-dark/70 bg-white p-2.5">
               <div className="flex items-center justify-between text-[8px] font-semibold text-ink-soft">
@@ -1120,7 +1198,9 @@ function GalleryUploadModal({
               onClick={upload}
               disabled={
                 uploading ||
-                !file
+                !file ||
+                (isPreWedding &&
+                  !token.trim())
               }
               className="flex flex-[1.5] items-center justify-center gap-1 rounded-full bg-wine px-2 py-2.5 text-[8px] font-bold uppercase tracking-[0.1em] text-white shadow-sm transition hover:bg-wine/90 disabled:cursor-not-allowed disabled:opacity-35"
             >

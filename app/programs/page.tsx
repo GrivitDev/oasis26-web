@@ -12,13 +12,6 @@ const programs = [
     href: '/programs/traditional-wedding',
   },
   {
-    number: '02',
-    title: 'Wedding Eve',
-    description:
-      'A special evening of preparation, gathering, prayer, and celebration before the wedding day.',
-    href: '/programs/wedding-eve',
-  },
-  {
     number: '03',
     title: 'Church Wedding',
     description:

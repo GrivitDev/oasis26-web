@@ -2,7 +2,6 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import crypto from 'crypto';
-import path from 'path';
 
 import clientPromise from '@/lib/mongodb';
 import cloudinary from '@/lib/cloudinary';
@@ -18,21 +17,8 @@ import {
 
 export const runtime = 'nodejs';
 
-const LOGO_PATH = path.join(
-  process.cwd(),
-  'public',
-  'logo.png',
-);
-
 const CLOUDINARY_FOLDER_PREFIX =
   'oasis26/gallery';
-
-const CLOUDINARY_LOGO_PUBLIC_ID =
-  'oasis26/branding/logo';
-
-let logoPublicIdPromise:
-  | Promise<string>
-  | null = null;
 
 /* ============================================================= */
 /* VALIDATION                                                     */
@@ -111,7 +97,9 @@ function isAllowedImageFormat(
     'webp',
     'heic',
     'heif',
-  ]).has(format.toLowerCase());
+  ]).has(
+    format.toLowerCase(),
+  );
 }
 
 function isAllowedVideoFormat(
@@ -127,117 +115,8 @@ function isAllowedVideoFormat(
     'mp4',
     'webm',
     'mov',
-  ]).has(format.toLowerCase());
-}
-
-/* ============================================================= */
-/* CLOUDINARY LOGO                                                */
-/* ============================================================= */
-
-async function ensureCloudinaryLogo(): Promise<string> {
-  if (logoPublicIdPromise) {
-    return logoPublicIdPromise;
-  }
-
-  logoPublicIdPromise =
-    (async () => {
-      try {
-        await cloudinary.api.resource(
-          CLOUDINARY_LOGO_PUBLIC_ID,
-          {
-            resource_type: 'image',
-          },
-        );
-
-        return CLOUDINARY_LOGO_PUBLIC_ID;
-      } catch {
-        try {
-          await cloudinary.uploader.upload(
-            LOGO_PATH,
-            {
-              public_id:
-                CLOUDINARY_LOGO_PUBLIC_ID,
-              resource_type: 'image',
-              overwrite: false,
-            },
-          );
-
-          return CLOUDINARY_LOGO_PUBLIC_ID;
-        } catch (error) {
-          console.error(
-            'Unable to prepare Cloudinary gallery logo:',
-            error,
-          );
-
-          throw new Error(
-            'Gallery branding asset is unavailable.',
-          );
-        }
-      }
-    })();
-
-  try {
-    return await logoPublicIdPromise;
-  } catch (error) {
-    logoPublicIdPromise = null;
-    throw error;
-  }
-}
-
-/* ============================================================= */
-/* BRANDED IMAGE URL                                              */
-/* ============================================================= */
-
-// src/app/api/gallery/upload/route.ts
-
-function createBrandedImageUrl(
-  publicId: string,
-): string {
-  return cloudinary.url(
-    publicId,
-    {
-      secure: true,
-      resource_type: 'image',
-      transformation: [
-        /*
-         * Logo layer.
-         *
-         * Cloudinary overlay IDs containing /
-         * must use : in transformation syntax.
-         */
-        {
-          width: 120,
-          crop: 'scale',
-          overlay:
-            'oasis26:branding:logo',
-        },
-        {
-          flags: 'layer_apply',
-          gravity: 'north_west',
-          x: 24,
-          y: 24,
-        },
-
-        /*
-         * OASIS'26 text layer.
-         */
-        {
-          color: 'white',
-          overlay: {
-            font_family: 'Arial',
-            font_size: 30,
-            font_weight: 'bold',
-            text: "OASIS'26",
-          },
-        },
-        {
-          flags: 'layer_apply',
-          gravity: 'north_west',
-          x: 154,
-          y: 62,
-        },
-      ],
-    },
+  ]).has(
+    format.toLowerCase(),
   );
 }
 
@@ -269,7 +148,9 @@ type UploadSignatureResponse = {
   signature: string;
   folder: string;
   publicId: string;
-  resourceType: GalleryMediaType;
+  resourceType:
+    | 'image'
+    | 'video';
 };
 
 async function createUploadSignature(
@@ -721,30 +602,6 @@ export async function POST(
       }
 
       /* ======================================================= */
-      /* FINAL URL                                                 */
-      /* ======================================================= */
-
-      let finalSecureUrl =
-        secureUrl;
-
-      if (
-        resourceType ===
-        GALLERY_MEDIA_TYPES.IMAGE
-      ) {
-        /*
-         * Ensure the OASIS'26 logo exists in
-         * Cloudinary before generating the
-         * branded delivery URL.
-         */
-        await ensureCloudinaryLogo();
-
-        finalSecureUrl =
-          createBrandedImageUrl(
-            publicId,
-          );
-      }
-
-      /* ======================================================= */
       /* MONGODB                                                   */
       /* ======================================================= */
 
@@ -776,10 +633,15 @@ export async function POST(
         });
       }
 
+      /*
+       * Save the original Cloudinary secure URL
+       * exactly as returned by Cloudinary.
+       *
+       * No branding or transformation is applied.
+       */
       const document = {
         publicId,
-        secureUrl:
-          finalSecureUrl,
+        secureUrl,
         resourceType,
         section,
         originalFilename:
