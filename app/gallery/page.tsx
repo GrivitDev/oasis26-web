@@ -1,3 +1,5 @@
+// src/app/gallery/page.tsx
+
 'use client';
 
 import Image from 'next/image';
@@ -25,6 +27,28 @@ import type { GalleryItem } from '@/components/gallery/gallery-card';
 type GallerySection =
   | 'pre-wedding'
   | 'live';
+
+const MAX_IMAGE_SIZE =
+  40 * 1024 * 1024;
+
+const MAX_VIDEO_SIZE =
+  80 * 1024 * 1024;
+
+const ALLOWED_IMAGE_TYPES =
+  new Set([
+    'image/jpeg',
+    'image/png',
+    'image/webp',
+    'image/heic',
+    'image/heif',
+  ]);
+
+const ALLOWED_VIDEO_TYPES =
+  new Set([
+    'video/mp4',
+    'video/webm',
+    'video/quicktime',
+  ]);
 
 export default function GalleryPage() {
   return (
@@ -72,17 +96,21 @@ function GalleryPageContent() {
     useState(false);
 
   useEffect(() => {
-    const frameId = window.requestAnimationFrame(() => {
-      setMounted(true);
-    });
+    const frameId =
+      window.requestAnimationFrame(() => {
+        setMounted(true);
+      });
 
     return () => {
-      window.cancelAnimationFrame(frameId);
+      window.cancelAnimationFrame(
+        frameId,
+      );
     };
   }, []);
 
   function refreshPage() {
     router.refresh();
+
     setRefreshKey(
       (current) => current + 1,
     );
@@ -228,6 +256,30 @@ type GalleryUploadModalProps = {
   onUploaded: () => void;
 };
 
+type UploadSignatureResponse = {
+  cloudName: string;
+  apiKey: string;
+  timestamp: number;
+  signature: string;
+  folder: string;
+  publicId: string;
+  resourceType:
+    | 'image'
+    | 'video';
+  completionToken: string;
+};
+
+type CloudinaryUploadResponse = {
+  public_id: string;
+  secure_url: string;
+  resource_type:
+    | 'image'
+    | 'video';
+  width?: number;
+  height?: number;
+  duration?: number;
+};
+
 function GalleryUploadModal({
   section,
   onClose,
@@ -261,10 +313,14 @@ function GalleryUploadModal({
     useState(false);
 
   useEffect(() => {
-    if (!file) {
-      return;
-    }
-  }, [file]);
+    return () => {
+      if (previewUrlRef.current) {
+        URL.revokeObjectURL(
+          previewUrlRef.current,
+        );
+      }
+    };
+  }, []);
 
   useEffect(() => {
     function handleKeyDown(
@@ -307,13 +363,100 @@ function GalleryUploadModal({
       URL.revokeObjectURL(
         previewUrlRef.current,
       );
+
+      previewUrlRef.current = '';
     }
 
-    const nextPreviewUrl = selectedFile
-      ? URL.createObjectURL(selectedFile)
-      : '';
+    if (!selectedFile) {
+      setFile(null);
+      setPreviewUrl('');
+      setError('');
+      setProgress(0);
+      setProcessing(false);
+      return;
+    }
 
-    previewUrlRef.current = nextPreviewUrl;
+    const isVideo =
+      selectedFile.type.startsWith(
+        'video/',
+      );
+
+    if (
+      isPreWedding &&
+      isVideo
+    ) {
+      setFile(null);
+      setPreviewUrl('');
+      setError(
+        'Videos are not allowed in the pre-wedding gallery.',
+      );
+      setProgress(0);
+      setProcessing(false);
+      return;
+    }
+
+    if (
+      !isPreWedding &&
+      isVideo &&
+      !ALLOWED_VIDEO_TYPES.has(
+        selectedFile.type,
+      )
+    ) {
+      setFile(null);
+      setPreviewUrl('');
+      setError(
+        'Please select an MP4, WebM, or MOV video.',
+      );
+      setProgress(0);
+      setProcessing(false);
+      return;
+    }
+
+    if (
+      !isVideo &&
+      !ALLOWED_IMAGE_TYPES.has(
+        selectedFile.type,
+      )
+    ) {
+      setFile(null);
+      setPreviewUrl('');
+      setError(
+        'Please select a JPEG, PNG, WebP, HEIC, or HEIF image.',
+      );
+      setProgress(0);
+      setProcessing(false);
+      return;
+    }
+
+    const maxSize =
+      isVideo
+        ? MAX_VIDEO_SIZE
+        : MAX_IMAGE_SIZE;
+
+    if (
+      selectedFile.size >
+      maxSize
+    ) {
+      setFile(null);
+      setPreviewUrl('');
+      setError(
+        isVideo
+          ? 'This video is too large. The maximum video size is 80 MB.'
+          : 'This image is too large. The maximum image size is 40 MB.',
+      );
+      setProgress(0);
+      setProcessing(false);
+      return;
+    }
+
+    const nextPreviewUrl =
+      URL.createObjectURL(
+        selectedFile,
+      );
+
+    previewUrlRef.current =
+      nextPreviewUrl;
+
     setFile(selectedFile);
     setPreviewUrl(nextPreviewUrl);
     setError('');
@@ -330,6 +473,7 @@ function GalleryUploadModal({
       URL.revokeObjectURL(
         previewUrlRef.current,
       );
+
       previewUrlRef.current = '';
     }
 
@@ -338,6 +482,285 @@ function GalleryUploadModal({
     setError('');
     setProgress(0);
     setProcessing(false);
+  }
+
+  async function requestUploadSignature(
+    resourceType:
+      | 'image'
+      | 'video',
+  ): Promise<UploadSignatureResponse> {
+    const response =
+      await fetch(
+        '/api/gallery/upload',
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type':
+              'application/json',
+          },
+          body: JSON.stringify({
+            action: 'sign',
+            section,
+            resourceType,
+            token: isPreWedding
+              ? token.trim()
+              : undefined,
+          }),
+        },
+      );
+
+    let data:
+      | UploadSignatureResponse
+      | { error?: string };
+
+    try {
+      data =
+        await response.json();
+    } catch {
+      throw new Error(
+        'Unable to prepare the upload.',
+      );
+    }
+
+    if (
+      !response.ok
+    ) {
+      throw new Error(
+        'error' in data &&
+        data.error
+          ? data.error
+          : 'Unable to prepare the upload.',
+      );
+    }
+
+    return data as UploadSignatureResponse;
+  }
+
+  async function uploadToCloudinary(
+    uploadSignature: UploadSignatureResponse,
+  ): Promise<CloudinaryUploadResponse> {
+    if (!file) {
+      throw new Error(
+        'No file selected.',
+      );
+    }
+
+    const resourceType =
+      uploadSignature.resourceType;
+
+    const cloudinaryFormData =
+      new FormData();
+
+    cloudinaryFormData.append(
+      'file',
+      file,
+    );
+
+    cloudinaryFormData.append(
+      'api_key',
+      uploadSignature.apiKey,
+    );
+
+    cloudinaryFormData.append(
+      'timestamp',
+      String(
+        uploadSignature.timestamp,
+      ),
+    );
+
+    cloudinaryFormData.append(
+      'signature',
+      uploadSignature.signature,
+    );
+
+    cloudinaryFormData.append(
+      'folder',
+      uploadSignature.folder,
+    );
+
+    cloudinaryFormData.append(
+      'public_id',
+      uploadSignature.publicId,
+    );
+
+    const cloudinaryUploadUrl =
+      `https://api.cloudinary.com/v1_1/${uploadSignature.cloudName}/${resourceType}/upload`;
+
+    return new Promise(
+      (resolve, reject) => {
+        const xhr =
+          new XMLHttpRequest();
+
+        xhr.open(
+          'POST',
+          cloudinaryUploadUrl,
+        );
+
+        xhr.upload.onprogress =
+          (event) => {
+            if (
+              !event.lengthComputable
+            ) {
+              return;
+            }
+
+            const percentage =
+              Math.round(
+                (event.loaded /
+                  event.total) *
+                  100,
+              );
+
+            /*
+             * 100% means Cloudinary has received
+             * the browser upload. We keep the UI
+             * at 99% until Vercel confirms that
+             * the MongoDB record has been created.
+             */
+            setProgress(
+              Math.min(
+                percentage,
+                99,
+              ),
+            );
+
+            if (
+              percentage >= 100
+            ) {
+              setProcessing(true);
+            }
+          };
+
+        xhr.onload = () => {
+          let response:
+            | CloudinaryUploadResponse
+            | {
+                error?: {
+                  message?: string;
+                };
+              }
+            | null = null;
+
+          try {
+            response =
+              JSON.parse(
+                xhr.responseText,
+              );
+          } catch {
+            response = null;
+          }
+
+          if (
+            xhr.status >= 200 &&
+            xhr.status < 300 &&
+            response &&
+            'public_id' in response
+          ) {
+            resolve(
+              response as CloudinaryUploadResponse,
+            );
+
+            return;
+          }
+
+          const cloudinaryError =
+            response &&
+            'error' in response
+              ? response.error
+                  ?.message
+              : undefined;
+
+          reject(
+            new Error(
+              cloudinaryError ||
+                'Cloudinary upload failed.',
+            ),
+          );
+        };
+
+        xhr.onerror = () => {
+          reject(
+            new Error(
+              'Network error while uploading to Cloudinary.',
+            ),
+          );
+        };
+
+        xhr.onabort = () => {
+          reject(
+            new Error(
+              'Upload was cancelled.',
+            ),
+          );
+        };
+
+        xhr.send(
+          cloudinaryFormData,
+        );
+      },
+    );
+  }
+
+  async function completeGalleryUpload(
+    uploadSignature: UploadSignatureResponse,
+    cloudinaryResult: CloudinaryUploadResponse,
+  ) {
+    const response =
+      await fetch(
+        '/api/gallery/upload',
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type':
+              'application/json',
+          },
+          body: JSON.stringify({
+            action: 'complete',
+            section,
+            completionToken:
+              uploadSignature.completionToken,
+            publicId:
+              cloudinaryResult.public_id,
+            secureUrl:
+              cloudinaryResult.secure_url,
+            resourceType:
+              cloudinaryResult.resource_type,
+            originalFilename:
+              file?.name ?? '',
+            width:
+              cloudinaryResult.width,
+            height:
+              cloudinaryResult.height,
+            duration:
+              cloudinaryResult.duration,
+          }),
+        },
+      );
+
+    let data:
+      | {
+          item?: unknown;
+          error?: string;
+        }
+      | null = null;
+
+    try {
+      data =
+        await response.json();
+    } catch {
+      data = null;
+    }
+
+    if (
+      !response.ok
+    ) {
+      throw new Error(
+        data?.error ||
+          'Unable to save the gallery item.',
+      );
+    }
+
+    return data;
   }
 
   async function upload() {
@@ -362,144 +785,99 @@ function GalleryUploadModal({
       return;
     }
 
+    const isVideo =
+      file.type.startsWith(
+        'video/',
+      );
+
+    const resourceType:
+      | 'image'
+      | 'video' =
+      isVideo
+        ? 'video'
+        : 'image';
+
+    if (
+      isPreWedding &&
+      isVideo
+    ) {
+      setError(
+        'Videos are not allowed in the pre-wedding gallery.',
+      );
+
+      return;
+    }
+
+    const maxSize =
+      isVideo
+        ? MAX_VIDEO_SIZE
+        : MAX_IMAGE_SIZE;
+
+    if (
+      file.size >
+      maxSize
+    ) {
+      setError(
+        isVideo
+          ? 'This video is too large. The maximum video size is 80 MB.'
+          : 'This image is too large. The maximum image size is 40 MB.',
+      );
+
+      return;
+    }
+
     try {
       setUploading(true);
       setProcessing(false);
       setError('');
       setProgress(0);
 
-      const formData =
-        new FormData();
-
-      formData.append(
-        'file',
-        file,
-      );
-
-      formData.append(
-        'section',
-        section,
-      );
-
-      if (isPreWedding) {
-        formData.append(
-          'token',
-          token.trim(),
+      /*
+       * STEP 1
+       *
+       * Send only a tiny JSON request to Vercel.
+       *
+       * The actual file does NOT go to Vercel.
+       */
+      const uploadSignature =
+        await requestUploadSignature(
+          resourceType,
         );
-      }
 
-      await new Promise<void>(
-        (resolve, reject) => {
-          const xhr =
-            new XMLHttpRequest();
+      /*
+       * STEP 2
+       *
+       * Send the actual file directly from
+       * the browser to Cloudinary.
+       */
+      const cloudinaryResult =
+        await uploadToCloudinary(
+          uploadSignature,
+        );
 
-          xhr.open(
-            'POST',
-            '/api/gallery/upload',
-          );
+      /*
+       * Cloudinary has now received the entire
+       * file. Vercel still has never received it.
+       *
+       * Only metadata is sent to Vercel.
+       */
+      setProcessing(true);
 
-          xhr.upload.onprogress =
-            (event) => {
-              if (
-                !event.lengthComputable
-              ) {
-                return;
-              }
-
-              const percentage =
-                Math.round(
-                  (event.loaded /
-                    event.total) *
-                    100,
-                );
-
-              /*
-               * 100% here only means the browser
-               * has finished sending the request.
-               *
-               * The server still needs to process
-               * the file and upload it to Cloudinary.
-               *
-               * Therefore we deliberately stop at 99%.
-               */
-              setProgress(
-                Math.min(
-                  percentage,
-                  99,
-                ),
-              );
-
-              if (
-                percentage >= 100
-              ) {
-                setProcessing(true);
-              }
-            };
-
-          xhr.onload = () => {
-            let response: {
-              error?: string;
-            } = {};
-
-            try {
-              response =
-                JSON.parse(
-                  xhr.responseText,
-                );
-            } catch {
-              response = {};
-            }
-
-            if (
-              xhr.status < 200 ||
-              xhr.status >= 300
-            ) {
-              reject(
-                new Error(
-                  response.error ??
-                    'Upload failed.',
-                ),
-              );
-
-              return;
-            }
-
-            /*
-             * Only show 100% after the server
-             * has actually confirmed success.
-             */
-            setProgress(100);
-            setProcessing(false);
-
-            resolve();
-          };
-
-          xhr.onerror = () => {
-            reject(
-              new Error(
-                'Network error while uploading.',
-              ),
-            );
-          };
-
-          xhr.onabort = () => {
-            reject(
-              new Error(
-                'Upload was cancelled.',
-              ),
-            );
-          };
-
-          xhr.send(
-            formData,
-          );
-        },
+      await completeGalleryUpload(
+        uploadSignature,
+        cloudinaryResult,
       );
 
       /*
+       * Only show 100% after Cloudinary upload
+       * AND MongoDB save have both succeeded.
+       */
+      setProgress(100);
+      setProcessing(false);
+
+      /*
        * Keep the success state visible briefly
-       * so the user can actually see that the
-       * upload completed before the page refreshes.
+       * before refreshing the gallery.
        */
       await new Promise<void>(
         (resolve) => {
@@ -511,17 +889,17 @@ function GalleryUploadModal({
       );
 
       onUploaded();
-    } catch (error) {
+    } catch (uploadError) {
       console.error(
         'Gallery upload error:',
-        error,
+        uploadError,
       );
 
       setProcessing(false);
 
       setError(
-        error instanceof Error
-          ? error.message
+        uploadError instanceof Error
+          ? uploadError.message
           : 'Unable to upload this file.',
       );
     } finally {
@@ -534,7 +912,10 @@ function GalleryUploadModal({
       'video/',
     ) ?? false;
 
-  if (typeof document === 'undefined') {
+  if (
+    typeof document ===
+    'undefined'
+  ) {
     return null;
   }
 
@@ -798,6 +1179,7 @@ function GalleryUploadModal({
               {uploading ? (
                 <>
                   <span className="h-2.5 w-2.5 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+
                   {processing
                     ? 'Processing'
                     : 'Uploading'}
@@ -805,6 +1187,7 @@ function GalleryUploadModal({
               ) : (
                 <>
                   <Check className="h-3 w-3" />
+
                   {isPreWedding
                     ? 'Add Photograph'
                     : 'Share Memory'}
@@ -833,7 +1216,10 @@ function formatFileSize(
     return `${bytes} B`;
   }
 
-  if (bytes < 1024 * 1024) {
+  if (
+    bytes <
+    1024 * 1024
+  ) {
     return `${(
       bytes / 1024
     ).toFixed(1)} KB`;

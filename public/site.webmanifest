@@ -10,12 +10,12 @@
   "theme_color": "#025740",
   "icons": [
     {
-      "src": "/favicon.ico",
+      "src": "/logo/favicon.ico",
       "sizes": "any",
       "type": "image/x-icon"
     },
     {
-      "src": "/apple-touch-icon.png",
+      "src": "/logo/apple-touch-icon.png",
       "sizes": "180x180",
       "type": "image/png"
     }
