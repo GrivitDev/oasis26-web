@@ -44,8 +44,8 @@ export interface GalleryItemResponse {
   createdAt: string;
 }
 
-export const MAX_IMAGE_SIZE = 40 * 1024 * 1024;
-export const MAX_VIDEO_SIZE = 80 * 1024 * 1024;
+export const MAX_IMAGE_SIZE = 10 * 1024 * 1024;
+export const MAX_VIDEO_SIZE = 90 * 1024 * 1024;
 
 export const ALLOWED_IMAGE_TYPES = new Set([
   'image/jpeg',
