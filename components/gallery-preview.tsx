@@ -1,3 +1,5 @@
+// src/components/gallery/gallery-preview.tsx
+
 import Image from 'next/image';
 import Link from 'next/link';
 
@@ -23,19 +25,23 @@ async function getGalleryPreview(): Promise<
 
     const documents = await db
       .collection('gallery')
-      .find({
-        section: 'pre-wedding',
-        resourceType: 'image',
-        secureUrl: {
-          $exists: true,
-          $ne: '',
+      .aggregate([
+        {
+          $match: {
+            section: 'pre-wedding',
+            resourceType: 'image',
+            secureUrl: {
+              $exists: true,
+              $ne: '',
+            },
+          },
         },
-      })
-      .sort({
-        createdAt: -1,
-        _id: -1,
-      })
-      .limit(15)
+        {
+          $sample: {
+            size: 12,
+          },
+        },
+      ])
       .toArray();
 
     return documents
@@ -130,24 +136,6 @@ const collageStyles = [
       'col-span-1 row-span-2 aspect-[4/5] rotate-[-1.5deg]',
     desktop:
       'lg:col-span-1 lg:row-span-2 lg:aspect-[4/5] lg:rotate-[-1.5deg]',
-  },
-  {
-    mobile:
-      'col-span-2 aspect-[16/10] rotate-[-1deg]',
-    desktop:
-      'lg:col-span-2 lg:aspect-[16/10] lg:rotate-[-1deg]',
-  },
-  {
-    mobile:
-      'col-span-1 aspect-square rotate-[2deg] translate-y-1',
-    desktop:
-      'lg:col-span-1 lg:aspect-square lg:rotate-[2deg] lg:translate-y-1',
-  },
-  {
-    mobile:
-      'col-span-1 aspect-[4/5] rotate-[-2deg]',
-    desktop:
-      'lg:col-span-1 lg:aspect-[4/5] lg:rotate-[-2deg]',
   },
 ];
 
