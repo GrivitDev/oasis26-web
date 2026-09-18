@@ -10,6 +10,7 @@ import Footer from '@/components/footer';
 
 import { SEO } from '@/config/seo';
 import { Suspense } from 'react';
+import { GalleryUploadProvider } from '@/components/gallery/gallery-upload-provider';
 
 const cormorant = Cormorant_Garamond({
   variable: '--font-cormorant',
@@ -191,7 +192,9 @@ export default function RootLayout({
           </Suspense>
 
           <main className="relative z-0 flex-1">
-            {children}
+            <GalleryUploadProvider>
+              {children}
+            </GalleryUploadProvider>
           </main>
 
           <Footer />

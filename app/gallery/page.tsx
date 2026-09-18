@@ -28,6 +28,9 @@ import {
 import GalleryCamera from '@/components/gallery/gallery-camera';
 import GalleryGrid from '@/components/gallery/gallery-grid';
 import GalleryMediaViewer from '@/components/gallery/gallery-media-viewer';
+import {
+  useGalleryUpload,
+} from '@/components/gallery/gallery-upload-provider';
 import type { GalleryItem } from '@/components/gallery/gallery-card';
 
 type GallerySection =
@@ -38,22 +41,6 @@ type SelectedGalleryFile = {
   id: string;
   file: File;
   previewUrl: string;
-};
-
-type UploadItemStatus =
-  | 'queued'
-  | 'uploading'
-  | 'processing'
-  | 'completed'
-  | 'failed';
-
-type UploadItem = {
-  id: string;
-  name: string;
-  size: number;
-  status: UploadItemStatus;
-  progress: number;
-  error?: string;
 };
 
 const MAX_SELECTION_COUNT = 25;
@@ -104,6 +91,11 @@ function GalleryPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
+  const {
+    startUpload,
+    isUploading,
+  } = useGalleryUpload();
+
   const sectionParam =
     searchParams.get('section');
 
@@ -141,6 +133,49 @@ function GalleryPageContent() {
       );
     };
   }, []);
+
+  useEffect(() => {
+    function handleUploadComplete(
+      event: Event,
+    ) {
+      const customEvent =
+        event as CustomEvent<{
+          sections?: GallerySection[];
+        }>;
+
+      const uploadedSections =
+        customEvent.detail
+          ?.sections ?? [];
+
+      if (
+        uploadedSections.includes(
+          section,
+        )
+      ) {
+        router.refresh();
+
+        setRefreshKey(
+          (current) =>
+            current + 1,
+        );
+      }
+    }
+
+    window.addEventListener(
+      'gallery-upload-complete',
+      handleUploadComplete,
+    );
+
+    return () => {
+      window.removeEventListener(
+        'gallery-upload-complete',
+        handleUploadComplete,
+      );
+    };
+  }, [
+    section,
+    router,
+  ]);
 
   function refreshPage() {
     router.refresh();
@@ -186,7 +221,9 @@ function GalleryPageContent() {
           <GalleryGrid
             section={section}
             refreshKey={refreshKey}
-            onOpen={setViewerItem}
+            onOpen={
+              setViewerItem
+            }
           />
         </div>
       </div>
@@ -200,11 +237,14 @@ function GalleryPageContent() {
           <div
             className="pointer-events-none fixed bottom-[calc(1.25rem+env(safe-area-inset-bottom))] right-4 z-[2147483646] flex flex-col items-center gap-2 sm:bottom-[calc(1.75rem+env(safe-area-inset-bottom))] sm:right-6"
           >
-            {section === 'live' && (
+            {section ===
+              'live' && (
               <button
                 type="button"
                 onClick={() =>
-                  setCameraOpen(true)
+                  setCameraOpen(
+                    true,
+                  )
                 }
                 className="pointer-events-auto flex h-12 w-12 items-center justify-center rounded-full border border-white/70 bg-emerald text-white shadow-[0_8px_24px_rgba(0,0,0,0.16)] backdrop-blur-md transition duration-300 hover:-translate-y-1 hover:shadow-[0_12px_30px_rgba(0,0,0,0.2)] sm:h-14 sm:w-14"
                 aria-label="Open camera"
@@ -217,16 +257,23 @@ function GalleryPageContent() {
             <button
               type="button"
               onClick={() =>
-                setUploadOpen(true)
+                setUploadOpen(
+                  true,
+                )
               }
-              className="pointer-events-auto flex h-12 w-12 items-center justify-center rounded-full border border-white/70 bg-wine text-white shadow-[0_8px_24px_rgba(0,0,0,0.16)] backdrop-blur-md transition duration-300 hover:-translate-y-1 hover:shadow-[0_12px_30px_rgba(0,0,0,0.2)] sm:h-14 sm:w-14"
+              disabled={
+                isUploading
+              }
+              className="pointer-events-auto flex h-12 w-12 items-center justify-center rounded-full border border-white/70 bg-wine text-white shadow-[0_8px_24px_rgba(0,0,0,0.16)] backdrop-blur-md transition duration-300 hover:-translate-y-1 hover:shadow-[0_12px_30px_rgba(0,0,0,0.2)] disabled:cursor-not-allowed disabled:opacity-50 sm:h-14 sm:w-14"
               aria-label={
-                section === 'pre-wedding'
+                section ===
+                'pre-wedding'
                   ? 'Upload pre-wedding photo'
                   : 'Upload photo or video'
               }
               title={
-                section === 'pre-wedding'
+                section ===
+                'pre-wedding'
                   ? 'Upload photo'
                   : 'Upload'
               }
@@ -242,22 +289,29 @@ function GalleryPageContent() {
       {/* ======================================================= */}
 
       {cameraOpen &&
-        section === 'live' && (
+        section ===
+          'live' && (
           <GalleryCamera
             onUploaded={
               refreshPage
             }
             onClose={() =>
-              setCameraOpen(false)
+              setCameraOpen(
+                false,
+              )
             }
           />
         )}
 
       {viewerItem && (
         <GalleryMediaViewer
-          item={viewerItem}
+          item={
+            viewerItem
+          }
           onClose={() =>
-            setViewerItem(null)
+            setViewerItem(
+              null,
+            )
           }
         />
       )}
@@ -266,11 +320,27 @@ function GalleryPageContent() {
         <GalleryUploadModal
           section={section}
           onClose={() =>
-            setUploadOpen(false)
+            setUploadOpen(
+              false,
+            )
           }
-          onUploaded={
-            refreshPage
-          }
+          onStartUpload={(
+            files,
+          ) => {
+            const started =
+              startUpload(
+                section,
+                files,
+              );
+
+            if (started) {
+              setUploadOpen(
+                false,
+              );
+            }
+
+            return started;
+          }}
         />
       )}
     </main>
@@ -286,36 +356,18 @@ type GalleryUploadModalProps = {
     | 'pre-wedding'
     | 'live';
   onClose: () => void;
-  onUploaded: () => void;
-};
-
-type UploadSignatureResponse = {
-  cloudName: string;
-  apiKey: string;
-  timestamp: number;
-  signature: string;
-  folder: string;
-  publicId: string;
-  resourceType:
-    | 'image'
-    | 'video';
-};
-
-type CloudinaryUploadResponse = {
-  public_id: string;
-  secure_url: string;
-  resource_type:
-    | 'image'
-    | 'video';
-  width?: number;
-  height?: number;
-  duration?: number;
+  onStartUpload: (
+    files: Array<{
+      id: string;
+      file: File;
+    }>,
+  ) => boolean;
 };
 
 function GalleryUploadModal({
   section,
   onClose,
-  onUploaded,
+  onStartUpload,
 }: GalleryUploadModalProps) {
   const isPreWedding =
     section === 'pre-wedding';
@@ -330,32 +382,11 @@ function GalleryUploadModal({
       new Set(),
     );
 
-  const [uploading, setUploading] =
-    useState(false);
-
-  const [uploadStarted, setUploadStarted] =
-    useState(false);
-
-  const [uploadFinished, setUploadFinished] =
-    useState(false);
-
-  const [error, setError] =
-    useState('');
-
   const [tokenValue, setTokenValue] =
     useState('');
 
-  const [overallProgress, setOverallProgress] =
-    useState(0);
-
-  const [processing, setProcessing] =
-    useState(false);
-
-  const [completedCount, setCompletedCount] =
-    useState(0);
-
-  const [uploadItems, setUploadItems] =
-    useState<UploadItem[]>([]);
+  const [error, setError] =
+    useState('');
 
   const fileInputRef =
     useRef<HTMLInputElement | null>(
@@ -377,14 +408,9 @@ function GalleryUploadModal({
       new Set(),
     );
 
-  const totalUploadBytesRef =
-    useRef(0);
-
-  const completedBytesRef =
-    useRef(0);
-
   useEffect(() => {
-    const previewUrls = previewUrlsRef.current;
+    const previewUrls =
+      previewUrlsRef.current;
 
     return () => {
       previewUrls.forEach(
@@ -404,8 +430,7 @@ function GalleryUploadModal({
       event: KeyboardEvent,
     ) {
       if (
-        event.key === 'Escape' &&
-        !uploading
+        event.key === 'Escape'
       ) {
         onClose();
       }
@@ -431,7 +456,7 @@ function GalleryUploadModal({
       document.body.style.overflow =
         previousOverflow;
     };
-  }, [onClose, uploading]);
+  }, [onClose]);
 
   function validateFile(
     selectedFile: File,
@@ -507,23 +532,24 @@ function GalleryUploadModal({
   }
 
   function openFilePicker() {
-    if (uploading) {
-      return;
-    }
-
     fileInputRef.current?.click();
   }
 
   function handleFileSelection(
     event: React.ChangeEvent<HTMLInputElement>,
   ) {
-    const incomingFiles = Array.from(
-      event.target.files ?? [],
-    );
+    const incomingFiles =
+      Array.from(
+        event.target.files ??
+          [],
+      );
 
-    event.currentTarget.value = '';
+    event.currentTarget.value =
+      '';
 
-    if (!incomingFiles.length) {
+    if (
+      !incomingFiles.length
+    ) {
       return;
     }
 
@@ -548,10 +574,11 @@ function GalleryUploadModal({
       return;
     }
 
-    const acceptedFiles:
-      | SelectedGalleryFile[] = [];
+    const acceptedFiles: SelectedGalleryFile[] =
+      [];
 
-    const errors: string[] = [];
+    const errors: string[] =
+      [];
 
     incomingFiles.forEach(
       (selectedFile) => {
@@ -578,7 +605,9 @@ function GalleryUploadModal({
       },
     );
 
-    if (acceptedFiles.length) {
+    if (
+      acceptedFiles.length
+    ) {
       setFiles(
         (current) => [
           ...current,
@@ -605,13 +634,10 @@ function GalleryUploadModal({
   function removeFile(
     id: string,
   ) {
-    if (uploading) {
-      return;
-    }
-
     const target =
       files.find(
-        (item) => item.id === id,
+        (item) =>
+          item.id === id,
       );
 
     if (target) {
@@ -648,7 +674,6 @@ function GalleryUploadModal({
 
   function removeSelectedFiles() {
     if (
-      uploading ||
       selectedIds.size === 0
     ) {
       return;
@@ -692,10 +717,6 @@ function GalleryUploadModal({
   function toggleSelected(
     id: string,
   ) {
-    if (uploading) {
-      return;
-    }
-
     setSelectedIds(
       (current) => {
         const next =
@@ -715,10 +736,6 @@ function GalleryUploadModal({
   }
 
   function selectAll() {
-    if (uploading) {
-      return;
-    }
-
     setSelectedIds(
       new Set(
         files.map(
@@ -729,10 +746,6 @@ function GalleryUploadModal({
   }
 
   function clearSelection() {
-    if (uploading) {
-      return;
-    }
-
     setSelectedIds(
       new Set(),
     );
@@ -741,10 +754,6 @@ function GalleryUploadModal({
   function openReplacePicker(
     id: string,
   ) {
-    if (uploading) {
-      return;
-    }
-
     replaceTargetIdRef.current =
       id;
 
@@ -849,10 +858,6 @@ function GalleryUploadModal({
   }
 
   function clearFiles() {
-    if (uploading) {
-      return;
-    }
-
     files.forEach(
       (item) => {
         URL.revokeObjectURL(
@@ -872,307 +877,25 @@ function GalleryUploadModal({
     setError('');
   }
 
-  function isTokenValid(): boolean {
+  function isTokenValid() {
     if (!isPreWedding) {
       return true;
     }
 
     const suppliedToken =
-      tokenValueRef.current.trim();
+      tokenValue.trim();
 
     return (
-      suppliedToken.length > 0 &&
-      PREWEDDING_UPLOAD_TOKEN.length > 0 &&
+      suppliedToken.length >
+        0 &&
+      PREWEDDING_UPLOAD_TOKEN.length >
+        0 &&
       suppliedToken ===
         PREWEDDING_UPLOAD_TOKEN
     );
   }
 
-  const tokenValueRef =
-    useRef('');
-
-  function handleTokenChange(
-    value: string,
-  ) {
-    tokenValueRef.current =
-      value;
-
-    setTokenValue(value);
-
-    setError('');
-  }
-
-  async function requestUploadSignature(
-    resourceType:
-      | 'image'
-      | 'video',
-  ): Promise<UploadSignatureResponse> {
-    const response =
-      await fetch(
-        '/api/gallery/upload',
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type':
-              'application/json',
-          },
-          body: JSON.stringify({
-            action: 'sign',
-            section,
-            resourceType,
-          }),
-        },
-      );
-
-    let data:
-      | UploadSignatureResponse
-      | { error?: string };
-
-    try {
-      data =
-        await response.json();
-    } catch {
-      throw new Error(
-        'Unable to prepare the upload.',
-      );
-    }
-
-    if (
-      !response.ok
-    ) {
-      throw new Error(
-        'error' in data &&
-        data.error
-          ? data.error
-          : 'Unable to prepare the upload.',
-      );
-    }
-
-    return data as UploadSignatureResponse;
-  }
-
-  async function uploadToCloudinary(
-    uploadFile: File,
-    uploadSignature: UploadSignatureResponse,
-    onProgress: (
-      loaded: number,
-      total: number,
-    ) => void,
-  ): Promise<CloudinaryUploadResponse> {
-    const resourceType =
-      uploadSignature.resourceType;
-
-    const cloudinaryFormData =
-      new FormData();
-
-    cloudinaryFormData.append(
-      'file',
-      uploadFile,
-    );
-
-    cloudinaryFormData.append(
-      'api_key',
-      uploadSignature.apiKey,
-    );
-
-    cloudinaryFormData.append(
-      'timestamp',
-      String(
-        uploadSignature.timestamp,
-      ),
-    );
-
-    cloudinaryFormData.append(
-      'signature',
-      uploadSignature.signature,
-    );
-
-    cloudinaryFormData.append(
-      'folder',
-      uploadSignature.folder,
-    );
-
-    cloudinaryFormData.append(
-      'public_id',
-      uploadSignature.publicId,
-    );
-
-    const cloudinaryUploadUrl =
-      `https://api.cloudinary.com/v1_1/${uploadSignature.cloudName}/${resourceType}/upload`;
-
-    return new Promise(
-      (resolve, reject) => {
-        const xhr =
-          new XMLHttpRequest();
-
-        xhr.open(
-          'POST',
-          cloudinaryUploadUrl,
-        );
-
-        xhr.upload.onprogress =
-          (event) => {
-            if (
-              !event.lengthComputable
-            ) {
-              return;
-            }
-
-            onProgress(
-              event.loaded,
-              event.total,
-            );
-          };
-
-        xhr.onload = () => {
-          let response:
-            | CloudinaryUploadResponse
-            | {
-                error?: {
-                  message?: string;
-                };
-              }
-            | null = null;
-
-          try {
-            response =
-              JSON.parse(
-                xhr.responseText,
-              );
-          } catch {
-            response = null;
-          }
-
-          if (
-            xhr.status >= 200 &&
-            xhr.status < 300 &&
-            response &&
-            'public_id' in response
-          ) {
-            resolve(
-              response as CloudinaryUploadResponse,
-            );
-
-            return;
-          }
-
-          const cloudinaryError =
-            response &&
-            'error' in response
-              ? response.error
-                  ?.message
-              : undefined;
-
-          reject(
-            new Error(
-              cloudinaryError ||
-                'Cloudinary upload failed.',
-            ),
-          );
-        };
-
-        xhr.onerror = () => {
-          reject(
-            new Error(
-              'Network error while uploading to Cloudinary.',
-            ),
-          );
-        };
-
-        xhr.onabort = () => {
-          reject(
-            new Error(
-              'Upload was cancelled.',
-            ),
-          );
-        };
-
-        xhr.send(
-          cloudinaryFormData,
-        );
-      },
-    );
-  }
-
-  async function completeGalleryUpload(
-    cloudinaryResult: CloudinaryUploadResponse,
-    uploadFile: File,
-  ) {
-    const response =
-      await fetch(
-        '/api/gallery/upload',
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type':
-              'application/json',
-          },
-          body: JSON.stringify({
-            action: 'complete',
-            section,
-            publicId:
-              cloudinaryResult.public_id,
-            secureUrl:
-              cloudinaryResult.secure_url,
-            resourceType:
-              cloudinaryResult.resource_type,
-            originalFilename:
-              uploadFile.name,
-            width:
-              cloudinaryResult.width,
-            height:
-              cloudinaryResult.height,
-            duration:
-              cloudinaryResult.duration,
-          }),
-        },
-      );
-
-    let data:
-      | {
-          item?: unknown;
-          error?: string;
-        }
-      | null = null;
-
-    try {
-      data =
-        await response.json();
-    } catch {
-      data = null;
-    }
-
-    if (
-      !response.ok
-    ) {
-      throw new Error(
-        data?.error ||
-          'Unable to save the gallery item.',
-      );
-    }
-
-    return data;
-  }
-
-  function updateUploadItem(
-    id: string,
-    update: Partial<UploadItem>,
-  ) {
-    setUploadItems(
-      (current) =>
-        current.map(
-          (item) =>
-            item.id === id
-              ? {
-                  ...item,
-                  ...update,
-                }
-              : item,
-        ),
-    );
-  }
-
-  async function upload() {
+  function upload() {
     if (!files.length) {
       setError(
         isPreWedding
@@ -1195,8 +918,9 @@ function GalleryUploadModal({
     }
 
     /*
-     * Confirm the pre-wedding token locally
-     * before ANY request is sent to the API.
+     * Pre-wedding token is confirmed locally
+     * BEFORE the upload manager sends anything
+     * to the API.
      */
     if (
       isPreWedding &&
@@ -1211,227 +935,34 @@ function GalleryUploadModal({
       return;
     }
 
-    const totalBytes =
-      files.reduce(
-        (total, item) =>
-          total +
-          item.file.size,
-        0,
+    const started =
+      onStartUpload(
+        files.map(
+          (item) => ({
+            id: item.id,
+            file: item.file,
+          }),
+        ),
       );
 
-    totalUploadBytesRef.current =
-      totalBytes;
-
-    completedBytesRef.current =
-      0;
-
-    setUploadItems(
-      files.map(
-        (item) => ({
-          id: item.id,
-          name: item.file.name,
-          size: item.file.size,
-          status: 'queued',
-          progress: 0,
-        }),
-      ),
-    );
-
-    setUploading(true);
-    setUploadStarted(true);
-    setUploadFinished(false);
-    setProcessing(false);
-    setCompletedCount(0);
-    setOverallProgress(0);
-    setError('');
-
-    let completed =
-      0;
-
-    for (
-      const selectedFile of files
-    ) {
-      updateUploadItem(
-        selectedFile.id,
-        {
-          status:
-            'uploading',
-          progress: 0,
-          error:
-            undefined,
-        },
+    if (!started) {
+      setError(
+        'Another upload is already in progress. Please wait until it is complete.',
       );
-
-      try {
-        const isVideo =
-          selectedFile.file.type.startsWith(
-            'video/',
-          );
-
-        const resourceType:
-          | 'image'
-          | 'video' =
-          isVideo
-            ? 'video'
-            : 'image';
-
-        const uploadSignature =
-          await requestUploadSignature(
-            resourceType,
-          );
-
-        const cloudinaryResult =
-          await uploadToCloudinary(
-            selectedFile.file,
-            uploadSignature,
-            (
-              loaded,
-              total,
-            ) => {
-              const itemProgress =
-                total > 0
-                  ? Math.round(
-                      (loaded /
-                        total) *
-                        100,
-                    )
-                  : 0;
-
-              updateUploadItem(
-                selectedFile.id,
-                {
-                  status:
-                    'uploading',
-                  progress:
-                    Math.min(
-                      itemProgress,
-                      99,
-                    ),
-                },
-              );
-
-              const overall =
-                totalUploadBytesRef.current >
-                0
-                  ? Math.round(
-                      ((completedBytesRef.current +
-                        loaded) /
-                        totalUploadBytesRef.current) *
-                        100,
-                    )
-                  : 0;
-
-              setOverallProgress(
-                Math.min(
-                  overall,
-                  99,
-                ),
-              );
-            },
-          );
-
-        setProcessing(true);
-
-        updateUploadItem(
-          selectedFile.id,
-          {
-            status:
-              'processing',
-            progress: 99,
-          },
-        );
-
-        await completeGalleryUpload(
-          cloudinaryResult,
-          selectedFile.file,
-        );
-
-        completedBytesRef.current +=
-          selectedFile.file.size;
-
-        completed += 1;
-
-        updateUploadItem(
-          selectedFile.id,
-          {
-            status:
-              'completed',
-            progress: 100,
-          },
-        );
-
-        setCompletedCount(
-          completed,
-        );
-
-        const finalOverall =
-          totalUploadBytesRef.current >
-          0
-            ? Math.round(
-                (completedBytesRef.current /
-                  totalUploadBytesRef.current) *
-                  100,
-              )
-            : 100;
-
-        setOverallProgress(
-          finalOverall,
-        );
-
-        setProcessing(false);
-      } catch (uploadError) {
-        const message =
-          uploadError instanceof Error
-            ? uploadError.message
-            : 'Unable to upload this file.';
-
-        updateUploadItem(
-          selectedFile.id,
-          {
-            status:
-              'failed',
-            progress: 0,
-            error: message,
-          },
-        );
-
-        setProcessing(false);
-      }
     }
-
-    setOverallProgress(100);
-    setUploading(false);
-    setUploadFinished(true);
-    setProcessing(false);
-
-    onUploaded();
   }
 
   const selectedCount =
     selectedIds.size;
 
   const canAddMore =
-    !uploading &&
     files.length <
-      MAX_SELECTION_COUNT;
+    MAX_SELECTION_COUNT;
 
   const allSelected =
     files.length > 0 &&
     selectedIds.size ===
       files.length;
-
-  const completedUploadCount =
-    uploadItems.filter(
-      (item) =>
-        item.status ===
-        'completed',
-    ).length;
-
-  const failedUploadCount =
-    uploadItems.filter(
-      (item) =>
-        item.status === 'failed',
-    ).length;
 
   const isVideoFile =
     (file: File) =>
@@ -1459,8 +990,7 @@ function GalleryUploadModal({
       onMouseDown={(event) => {
         if (
           event.target ===
-            event.currentTarget &&
-          !uploading
+          event.currentTarget
         ) {
           onClose();
         }
@@ -1481,30 +1011,23 @@ function GalleryUploadModal({
             <div className="min-w-0">
               <h2 className="font-[family-name:var(--font-cormorant)] text-xl font-semibold leading-none sm:text-2xl">
                 {isPreWedding
-                  ? uploadStarted
-                    ? 'Uploading Memories'
-                    : 'Pre-Wedding Memories'
-                  : uploadStarted
-                    ? 'Sharing Memories'
-                    : 'Share Your Memories'}
+                  ? 'Pre-Wedding Memories'
+                  : 'Share Your Memories'}
               </h2>
 
               <p className="mt-1 text-[9px] leading-3.5 text-white/65 sm:text-[10px] sm:leading-4">
-                {uploadStarted
-                  ? uploadFinished
-                    ? 'Your selected memories have finished processing.'
-                    : `Uploading up to ${MAX_SELECTION_COUNT} files directly to the gallery.`
-                  : isPreWedding
-                    ? `Select up to ${MAX_SELECTION_COUNT} photographs. Review, replace or remove anything before uploading.`
-                    : `Select up to ${MAX_SELECTION_COUNT} photos or videos. Review, replace or remove anything before uploading.`}
+                {isPreWedding
+                  ? `Select up to ${MAX_SELECTION_COUNT} photographs. Review, replace or remove anything before uploading.`
+                  : `Select up to ${MAX_SELECTION_COUNT} photos or videos. Review, replace or remove anything before uploading.`}
               </p>
             </div>
 
             <button
               type="button"
-              onClick={onClose}
-              disabled={uploading}
-              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-white/15 bg-white/10 text-white transition hover:bg-white/20 disabled:cursor-not-allowed disabled:opacity-40"
+              onClick={
+                onClose
+              }
+              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-white/15 bg-white/10 text-white transition hover:bg-white/20"
               aria-label="Close upload"
             >
               <X className="h-3.5 w-3.5" />
@@ -1513,662 +1036,436 @@ function GalleryUploadModal({
         </div>
 
         {/* ===================================================== */}
-        {/* UPLOAD STATUS                                          */}
+        {/* CONTENT                                                 */}
         {/* ===================================================== */}
 
-        {uploadStarted ? (
-          <div className="p-3.5 sm:p-4">
+        <div className="p-3.5 sm:p-4">
 
-            {/* OVERALL STATUS */}
+          {/* =================================================== */}
+          {/* TOKEN                                                  */}
+          {/* =================================================== */}
 
-            <div className="rounded-[18px] border border-sand-dark/70 bg-white p-3">
-              <div className="flex items-center justify-between gap-3">
+          {isPreWedding && (
+            <div className="mb-2.5 rounded-[16px] border border-sand-dark/70 bg-white p-2.5">
+              <div className="flex items-center gap-2">
+                <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-wine/10 text-wine">
+                  <LockKeyhole className="h-3 w-3" />
+                </div>
+
                 <div className="min-w-0">
-                  <p className="text-[9px] font-bold uppercase tracking-[0.12em] text-wine">
-                    {uploadFinished
-                      ? failedUploadCount > 0
-                        ? 'Upload finished with some errors'
-                        : 'Upload complete'
-                      : processing
-                        ? 'Saving to gallery'
-                        : 'Uploading'}
+                  <p className="text-[8px] font-bold uppercase tracking-[0.12em] text-wine">
+                    Private upload
                   </p>
 
-                  <p className="mt-0.5 text-[8px] text-ink-soft">
-                    {uploadFinished
-                      ? `${completedUploadCount} of ${uploadItems.length} files completed${
-                          failedUploadCount
-                            ? ` • ${failedUploadCount} failed`
-                            : ''
-                        }`
-                      : `${completedCount} of ${uploadItems.length} files completed`}
+                  <p className="mt-0.5 text-[8px] leading-3.5 text-ink-soft">
+                    Enter the upload token to continue.
+                  </p>
+                </div>
+              </div>
+
+              <input
+                type="text"
+                value={
+                  tokenValue
+                }
+                onChange={(
+                  event,
+                ) => {
+                  setTokenValue(
+                    event.target
+                      .value,
+                  );
+
+                  setError('');
+                }}
+                placeholder="Private upload token"
+                autoComplete="off"
+                spellCheck={
+                  false
+                }
+                className="mt-2 w-full rounded-lg border border-sand-dark/70 bg-cream px-3 py-2 text-[10px] text-ink outline-none transition placeholder:text-ink-soft/50 focus:border-wine"
+              />
+            </div>
+          )}
+
+          {/* =================================================== */}
+          {/* SELECTION TOOLBAR                                    */}
+          {/* =================================================== */}
+
+          {files.length >
+          0 ? (
+            <>
+              <div className="mb-2.5 flex flex-wrap items-center justify-between gap-2 rounded-[15px] border border-sand-dark/70 bg-white px-2.5 py-2">
+                <div className="min-w-0">
+                  <p className="text-[8px] font-bold uppercase tracking-[0.1em] text-wine">
+                    {files.length} /{' '}
+                    {
+                      MAX_SELECTION_COUNT
+                    }{' '}
+                    selected
+                  </p>
+
+                  <p className="mt-0.5 text-[7px] text-ink-soft">
+                    Check items to remove them, or replace individual items before uploading.
                   </p>
                 </div>
 
-                <span className="shrink-0 text-sm font-bold text-wine">
-                  {overallProgress}%
-                </span>
-              </div>
-
-              <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-sand">
-                <div
-                  className="h-full rounded-full bg-wine transition-all duration-200"
-                  style={{
-                    width: `${overallProgress}%`,
-                  }}
-                />
-              </div>
-            </div>
-
-            {/* FILE STATUS LIST */}
-
-            <div className="mt-2.5 max-h-[58vh] overflow-y-auto rounded-[18px] border border-sand-dark/70 bg-white p-2">
-              <div className="space-y-1.5">
-                {uploadItems.map(
-                  (item) => (
-                    <div
-                      key={item.id}
-                      className="rounded-[13px] border border-sand-dark/50 bg-cream/55 px-2.5 py-2"
+                <div className="flex shrink-0 items-center gap-1">
+                  {!allSelected && (
+                    <button
+                      type="button"
+                      onClick={
+                        selectAll
+                      }
+                      className="rounded-full border border-sand-dark/70 bg-cream px-2 py-1.5 text-[7px] font-bold uppercase tracking-[0.08em] text-ink-soft transition hover:bg-sand"
                     >
-                      <div className="flex items-center gap-2">
-                        <div className="min-w-0 flex-1">
-                          <p className="truncate text-[9px] font-semibold text-ink">
-                            {item.name}
-                          </p>
+                      Select all
+                    </button>
+                  )}
 
-                          <p className="mt-0.5 text-[7px] text-ink-soft">
-                            {formatFileSize(
-                              item.size,
-                            )}
-                          </p>
-                        </div>
+                  {allSelected && (
+                    <button
+                      type="button"
+                      onClick={
+                        clearSelection
+                      }
+                      className="rounded-full border border-sand-dark/70 bg-cream px-2 py-1.5 text-[7px] font-bold uppercase tracking-[0.08em] text-ink-soft transition hover:bg-sand"
+                    >
+                      Clear
+                    </button>
+                  )}
 
-                        <div className="shrink-0 text-[7px] font-bold uppercase tracking-[0.08em]">
-                          {item.status ===
-                          'completed' ? (
-                            <span className="text-emerald">
-                              Complete
-                            </span>
-                          ) : item.status ===
-                            'failed' ? (
-                            <span className="text-wine">
-                              Failed
-                            </span>
-                          ) : item.status ===
-                            'processing' ? (
-                            <span className="text-emerald">
-                              Saving
-                            </span>
-                          ) : item.status ===
-                            'uploading' ? (
-                            <span className="text-wine">
-                              {item.progress}%
-                            </span>
-                          ) : (
-                            <span className="text-ink-soft">
-                              Queued
-                            </span>
-                          )}
-                        </div>
-                      </div>
-
-                      {(item.status ===
-                        'uploading' ||
-                        item.status ===
-                          'processing') && (
-                        <div className="mt-1.5 h-1 overflow-hidden rounded-full bg-sand">
-                          <div
-                            className={`h-full rounded-full ${
-                              item.status ===
-                              'processing'
-                                ? 'animate-pulse bg-emerald'
-                                : 'bg-wine'
-                            }`}
-                            style={{
-                              width: `${item.progress}%`,
-                            }}
-                          />
-                        </div>
-                      )}
-
-                      {item.status ===
-                        'failed' &&
-                        item.error && (
-                          <p className="mt-1 text-[7px] leading-3 text-wine">
-                            {
-                              item.error
-                            }
-                          </p>
-                        )}
-                    </div>
-                  ),
-                )}
-              </div>
-            </div>
-
-            {/* FINISHED */}
-
-            {uploadFinished && (
-              <div className="mt-2.5 rounded-[16px] border border-emerald/20 bg-emerald/5 px-3 py-2.5">
-                <p className="text-[8px] leading-3.5 text-emerald">
-                  {failedUploadCount
-                    ? `${completedUploadCount} file${
-                        completedUploadCount ===
-                        1
-                          ? ''
-                          : 's'
-                      } uploaded successfully. ${
-                        failedUploadCount
-                      } file${
-                        failedUploadCount ===
-                        1
-                          ? ''
-                          : 's'
-                      } could not be uploaded.`
-                    : `All ${completedUploadCount} selected file${
-                        completedUploadCount ===
-                        1
-                          ? ''
-                          : 's'
-                      } have been uploaded successfully.`}
-                </p>
-              </div>
-            )}
-
-            {/* CLOSE */}
-
-            <div className="mt-3 flex gap-1.5">
-              <button
-                type="button"
-                onClick={onClose}
-                disabled={uploading}
-                className="flex-1 rounded-full border border-sand-dark/70 bg-white px-2 py-2.5 text-[8px] font-bold uppercase tracking-[0.1em] text-ink-soft transition hover:bg-sand disabled:cursor-not-allowed disabled:opacity-40"
-              >
-                {uploading
-                  ? 'Uploading...'
-                  : 'Close'}
-              </button>
-
-              {uploadFinished && (
-                <button
-                  type="button"
-                  onClick={onClose}
-                  className="flex flex-[1.5] items-center justify-center gap-1 rounded-full bg-wine px-2 py-2.5 text-[8px] font-bold uppercase tracking-[0.1em] text-white shadow-sm transition hover:bg-wine/90"
-                >
-                  <Check className="h-3 w-3" />
-                  Done
-                </button>
-              )}
-            </div>
-          </div>
-        ) : (
-          <div className="p-3.5 sm:p-4">
-
-            {/* ================================================= */}
-            {/* TOKEN                                              */}
-            {/* ================================================= */}
-
-            {isPreWedding && (
-              <div className="mb-2.5 rounded-[16px] border border-sand-dark/70 bg-white p-2.5">
-                <div className="flex items-center gap-2">
-                  <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-wine/10 text-wine">
-                    <LockKeyhole className="h-3 w-3" />
-                  </div>
-
-                  <div className="min-w-0">
-                    <p className="text-[8px] font-bold uppercase tracking-[0.12em] text-wine">
-                      Private upload
-                    </p>
-
-                    <p className="mt-0.5 text-[8px] leading-3.5 text-ink-soft">
-                      Enter the upload token to continue.
-                    </p>
-                  </div>
+                  {selectedCount >
+                    0 && (
+                    <button
+                      type="button"
+                      onClick={
+                        removeSelectedFiles
+                      }
+                      className="inline-flex items-center gap-1 rounded-full bg-wine px-2 py-1.5 text-[7px] font-bold uppercase tracking-[0.08em] text-white transition hover:bg-wine/90"
+                    >
+                      <Trash2 className="h-2.5 w-2.5" />
+                      Remove{' '}
+                      {
+                        selectedCount
+                      }
+                    </button>
+                  )}
                 </div>
-
-                <input
-                  type="text"
-                  defaultValue=""
-                  disabled={
-                    uploading
-                  }
-                  onChange={(
-                    event,
-                  ) =>
-                    handleTokenChange(
-                      event.target
-                        .value,
-                    )
-                  }
-                  placeholder="Private upload token"
-                  autoComplete="off"
-                  spellCheck={
-                    false
-                  }
-                  className="mt-2 w-full rounded-lg border border-sand-dark/70 bg-cream px-3 py-2 text-[10px] text-ink outline-none transition placeholder:text-ink-soft/50 focus:border-wine"
-                />
               </div>
-            )}
 
-            {/* ================================================= */}
-            {/* SELECTION TOOLBAR                                  */}
-            {/* ================================================= */}
+              {/* ================================================= */}
+              {/* PREVIEW GRID                                       */}
+              {/* ================================================= */}
 
-            {files.length > 0 ? (
-              <>
-                <div className="mb-2.5 flex flex-wrap items-center justify-between gap-2 rounded-[15px] border border-sand-dark/70 bg-white px-2.5 py-2">
-                  <div className="min-w-0">
-                    <p className="text-[8px] font-bold uppercase tracking-[0.1em] text-wine">
-                      {files.length} /{' '}
-                      {MAX_SELECTION_COUNT}{' '}
-                      selected
-                    </p>
+              <div className="max-h-[54vh] overflow-y-auto rounded-[18px] border border-sand-dark/70 bg-white p-2.5 sm:p-3">
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
+                  {files.map(
+                    (item) => {
+                      const isVideo =
+                        isVideoFile(
+                          item.file,
+                        );
 
-                    <p className="mt-0.5 text-[7px] text-ink-soft">
-                      Check items to remove them, or replace any item before uploading.
-                    </p>
-                  </div>
+                      const checked =
+                        selectedIds.has(
+                          item.id,
+                        );
 
-                  <div className="flex shrink-0 items-center gap-1">
-                    {!allSelected && (
-                      <button
-                        type="button"
-                        onClick={
-                          selectAll
-                        }
-                        className="rounded-full border border-sand-dark/70 bg-cream px-2 py-1.5 text-[7px] font-bold uppercase tracking-[0.08em] text-ink-soft transition hover:bg-sand"
-                      >
-                        Select all
-                      </button>
-                    )}
-
-                    {allSelected && (
-                      <button
-                        type="button"
-                        onClick={
-                          clearSelection
-                        }
-                        className="rounded-full border border-sand-dark/70 bg-cream px-2 py-1.5 text-[7px] font-bold uppercase tracking-[0.08em] text-ink-soft transition hover:bg-sand"
-                      >
-                        Clear
-                      </button>
-                    )}
-
-                    {selectedCount >
-                      0 && (
-                      <button
-                        type="button"
-                        onClick={
-                          removeSelectedFiles
-                        }
-                        className="inline-flex items-center gap-1 rounded-full bg-wine px-2 py-1.5 text-[7px] font-bold uppercase tracking-[0.08em] text-white transition hover:bg-wine/90"
-                      >
-                        <Trash2 className="h-2.5 w-2.5" />
-                        Remove{' '}
-                        {
-                          selectedCount
-                        }
-                      </button>
-                    )}
-                  </div>
-                </div>
-
-                {/* ================================================= */}
-                {/* PREVIEW GRID                                       */}
-                {/* ================================================= */}
-
-                <div className="max-h-[54vh] overflow-y-auto rounded-[18px] border border-sand-dark/70 bg-white p-2.5 sm:p-3">
-                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
-                    {files.map(
-                      (item) => {
-                        const isVideo =
-                          isVideoFile(
-                            item.file,
-                          );
-
-                        const checked =
-                          selectedIds.has(
-                            item.id,
-                          );
-
-                        return (
-                          <div
-                            key={
-                              item.id
-                            }
-                            className={`group relative overflow-hidden rounded-[14px] border bg-white transition ${
-                              checked
-                                ? 'border-wine ring-2 ring-wine/15'
-                                : 'border-sand-dark/60'
-                            }`}
-                          >
-                            {/* MEDIA */}
-
-                            <div className="relative aspect-square overflow-hidden bg-ink">
-                              {isVideo ? (
-                                <video
-                                  src={
-                                    item.previewUrl
-                                  }
-                                  muted
-                                  playsInline
-                                  controls
-                                  className="h-full w-full object-cover"
-                                />
-                              ) : (
-                                <Image
-                                  src={
-                                    item.previewUrl
-                                  }
-                                  alt={
-                                    item
-                                      .file
-                                      .name
-                                  }
-                                  fill
-                                  unoptimized
-                                  sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
-                                  className="object-cover"
-                                />
-                              )}
-
-                              {/* CHECKBOX */}
-
-                              <label className="absolute left-2 top-2 z-10 flex h-7 w-7 cursor-pointer items-center justify-center rounded-full bg-ink/65 backdrop-blur">
-                                <input
-                                  type="checkbox"
-                                  checked={
-                                    checked
-                                  }
-                                  onChange={() =>
-                                    toggleSelected(
-                                      item.id,
-                                    )
-                                  }
-                                  className="h-3.5 w-3.5 accent-wine"
-                                  aria-label={`Select ${item.file.name}`}
-                                />
-                              </label>
-
-                              {/* REMOVE */}
-
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  removeFile(
-                                    item.id,
-                                  )
+                      return (
+                        <div
+                          key={
+                            item.id
+                          }
+                          className={`group relative overflow-hidden rounded-[14px] border bg-white transition ${
+                            checked
+                              ? 'border-wine ring-2 ring-wine/15'
+                              : 'border-sand-dark/60'
+                          }`}
+                        >
+                          <div className="relative aspect-square overflow-hidden bg-ink">
+                            {isVideo ? (
+                              <video
+                                src={
+                                  item.previewUrl
                                 }
-                                className="absolute right-2 top-2 z-10 flex h-7 w-7 items-center justify-center rounded-full bg-ink/65 text-white backdrop-blur transition hover:bg-ink"
-                                aria-label={`Remove ${item.file.name}`}
-                                title="Remove"
-                              >
-                                <X className="h-3 w-3" />
-                              </button>
-
-                              {/* TYPE */}
-
-                              <div className="absolute bottom-2 left-2 rounded-full bg-ink/65 px-2 py-1 text-[6px] font-bold uppercase tracking-[0.08em] text-white backdrop-blur">
-                                {isVideo
-                                  ? 'Video'
-                                  : 'Photo'}
-                              </div>
-                            </div>
-
-                            {/* DETAILS */}
-
-                            <div className="p-2">
-                              <p className="truncate text-[8px] font-semibold text-ink">
-                                {
+                                muted
+                                playsInline
+                                controls
+                                className="h-full w-full object-cover"
+                              />
+                            ) : (
+                              <Image
+                                src={
+                                  item.previewUrl
+                                }
+                                alt={
                                   item
                                     .file
                                     .name
                                 }
-                              </p>
+                                fill
+                                unoptimized
+                                sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
+                                className="object-cover"
+                              />
+                            )}
 
-                              <p className="mt-0.5 text-[7px] text-ink-soft">
-                                {formatFileSize(
-                                  item
-                                    .file
-                                    .size,
-                                )}
-                              </p>
-
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  openReplacePicker(
+                            <label className="absolute left-2 top-2 z-10 flex h-7 w-7 cursor-pointer items-center justify-center rounded-full bg-ink/65 backdrop-blur">
+                              <input
+                                type="checkbox"
+                                checked={
+                                  checked
+                                }
+                                onChange={() =>
+                                  toggleSelected(
                                     item.id,
                                   )
                                 }
-                                className="mt-2 inline-flex w-full items-center justify-center gap-1 rounded-full border border-sand-dark/70 bg-cream px-2 py-1.5 text-[7px] font-bold uppercase tracking-[0.08em] text-ink-soft transition hover:bg-sand"
-                              >
-                                <RefreshCw className="h-2.5 w-2.5" />
-                                Replace
-                              </button>
+                                className="h-3.5 w-3.5 accent-wine"
+                                aria-label={`Select ${item.file.name}`}
+                              />
+                            </label>
+
+                            <button
+                              type="button"
+                              onClick={() =>
+                                removeFile(
+                                  item.id,
+                                )
+                              }
+                              className="absolute right-2 top-2 z-10 flex h-7 w-7 items-center justify-center rounded-full bg-ink/65 text-white backdrop-blur transition hover:bg-ink"
+                              aria-label={`Remove ${item.file.name}`}
+                            >
+                              <X className="h-3 w-3" />
+                            </button>
+
+                            <div className="absolute bottom-2 left-2 rounded-full bg-ink/65 px-2 py-1 text-[6px] font-bold uppercase tracking-[0.08em] text-white backdrop-blur">
+                              {isVideo
+                                ? 'Video'
+                                : 'Photo'}
                             </div>
                           </div>
-                        );
-                      },
-                    )}
-                  </div>
+
+                          <div className="p-2">
+                            <p className="truncate text-[8px] font-semibold text-ink">
+                              {
+                                item
+                                  .file
+                                  .name
+                              }
+                            </p>
+
+                            <p className="mt-0.5 text-[7px] text-ink-soft">
+                              {formatFileSize(
+                                item
+                                  .file
+                                  .size,
+                              )}
+                            </p>
+
+                            <button
+                              type="button"
+                              onClick={() =>
+                                openReplacePicker(
+                                  item.id,
+                                )
+                              }
+                              className="mt-2 inline-flex w-full items-center justify-center gap-1 rounded-full border border-sand-dark/70 bg-cream px-2 py-1.5 text-[7px] font-bold uppercase tracking-[0.08em] text-ink-soft transition hover:bg-sand"
+                            >
+                              <RefreshCw className="h-2.5 w-2.5" />
+                              Replace
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    },
+                  )}
                 </div>
-              </>
-            ) : (
-              /* ================================================= */
-              /* EMPTY SELECTION                                   */
-              /* ================================================= */
+              </div>
+            </>
+          ) : (
+            /* ================================================= */
+            /* EMPTY SELECTION                                   */
+            /* ================================================= */
 
-              <label className="group flex min-h-48 cursor-pointer flex-col items-center justify-center rounded-[18px] border border-dashed border-sand-dark/80 bg-white px-4 py-8 text-center transition hover:border-wine/50 hover:bg-white/80">
-                <span className="flex h-10 w-10 items-center justify-center rounded-full bg-wine/10 text-wine transition group-hover:scale-105">
-                  <Upload className="h-4 w-4" />
-                </span>
+            <label
+              onClick={
+                openFilePicker
+              }
+              className="group flex min-h-48 cursor-pointer flex-col items-center justify-center rounded-[18px] border border-dashed border-sand-dark/80 bg-white px-4 py-8 text-center transition hover:border-wine/50 hover:bg-white/80"
+            >
+              <span className="flex h-10 w-10 items-center justify-center rounded-full bg-wine/10 text-wine transition group-hover:scale-105">
+                <Upload className="h-4 w-4" />
+              </span>
 
-                <span className="mt-2.5 font-[family-name:var(--font-cormorant)] text-lg font-semibold text-wine sm:text-xl">
-                  Choose your memory
-                </span>
+              <span className="mt-2.5 font-[family-name:var(--font-cormorant)] text-lg font-semibold text-wine sm:text-xl">
+                Choose your memory
+              </span>
 
-                <span className="mt-0.5 text-[9px] leading-4 text-ink-soft">
-                  {isPreWedding
-                    ? `Select up to ${MAX_SELECTION_COUNT} photographs`
-                    : `Select up to ${MAX_SELECTION_COUNT} photos or videos`}
-                </span>
+              <span className="mt-0.5 text-[9px] leading-4 text-ink-soft">
+                {isPreWedding
+                  ? `Select up to ${MAX_SELECTION_COUNT} photographs`
+                  : `Select up to ${MAX_SELECTION_COUNT} photos or videos`}
+              </span>
 
-                <span className="mt-2.5 rounded-full bg-cream px-2.5 py-1 text-[7px] font-bold uppercase tracking-[0.12em] text-emerald">
-                  {isPreWedding
-                    ? 'Photos only'
-                    : 'Photos & videos'}
-                </span>
+              <span className="mt-2.5 rounded-full bg-cream px-2.5 py-1 text-[7px] font-bold uppercase tracking-[0.12em] text-emerald">
+                {isPreWedding
+                  ? 'Photos only'
+                  : 'Photos & videos'}
+              </span>
+            </label>
+          )}
 
-                <input
-                  ref={
-                    fileInputRef
-                  }
-                  type="file"
-                  multiple
-                  accept={
-                    isPreWedding
-                      ? 'image/jpeg,image/png,image/webp,image/heic,image/heif'
-                      : 'image/jpeg,image/png,image/webp,image/heic,image/heif,video/mp4,video/webm,video/quicktime'
-                  }
-                  disabled={
-                    uploading
-                  }
-                  onChange={
-                    handleFileSelection
-                  }
-                  className="sr-only"
-                />
-              </label>
-            )}
+          {/* =================================================== */}
+          {/* FILE INPUTS                                           */}
+          {/* =================================================== */}
 
-            {/* ================================================= */}
-            {/* ADD MORE / HIDDEN INPUTS                           */}
-            {/* ================================================= */}
+          <input
+            ref={
+              fileInputRef
+            }
+            type="file"
+            multiple
+            accept={
+              isPreWedding
+                ? 'image/jpeg,image/png,image/webp,image/heic,image/heif'
+                : 'image/jpeg,image/png,image/webp,image/heic,image/heif,video/mp4,video/webm,video/quicktime'
+            }
+            onChange={
+              handleFileSelection
+            }
+            className="sr-only"
+          />
 
-            {files.length > 0 && (
-              <div className="mt-2.5 flex items-center justify-between gap-2">
+          <input
+            ref={
+              replaceInputRef
+            }
+            type="file"
+            accept={
+              isPreWedding
+                ? 'image/jpeg,image/png,image/webp,image/heic,image/heif'
+                : 'image/jpeg,image/png,image/webp,image/heic,image/heif,video/mp4,video/webm,video/quicktime'
+            }
+            onChange={
+              handleReplaceSelection
+            }
+            className="sr-only"
+          />
+
+          {/* =================================================== */}
+          {/* ADD MORE                                             */}
+          {/* =================================================== */}
+
+          {files.length >
+            0 && (
+            <div className="mt-2.5 flex items-center justify-between gap-2">
+              <button
+                type="button"
+                onClick={
+                  clearFiles
+                }
+                className="inline-flex items-center gap-1 rounded-full border border-sand-dark/70 bg-white px-2.5 py-1.5 text-[7px] font-bold uppercase tracking-[0.08em] text-ink-soft transition hover:bg-sand"
+              >
+                <Trash2 className="h-2.5 w-2.5" />
+                Clear all
+              </button>
+
+              {canAddMore ? (
                 <button
                   type="button"
                   onClick={
-                    clearFiles
+                    openFilePicker
                   }
-                  className="inline-flex items-center gap-1 rounded-full border border-sand-dark/70 bg-white px-2.5 py-1.5 text-[7px] font-bold uppercase tracking-[0.08em] text-ink-soft transition hover:bg-sand"
+                  className="inline-flex items-center gap-1 rounded-full border border-wine/30 bg-wine/5 px-2.5 py-1.5 text-[7px] font-bold uppercase tracking-[0.08em] text-wine transition hover:bg-wine/10"
                 >
-                  <Trash2 className="h-2.5 w-2.5" />
-                  Clear all
+                  <Upload className="h-2.5 w-2.5" />
+                  Add more
                 </button>
+              ) : (
+                <span className="text-[7px] font-bold uppercase tracking-[0.08em] text-emerald">
+                  Maximum reached
+                </span>
+              )}
+            </div>
+          )}
 
-                {canAddMore ? (
-                  <button
-                    type="button"
-                    onClick={
-                      openFilePicker
-                    }
-                    className="inline-flex items-center gap-1 rounded-full border border-wine/30 bg-wine/5 px-2.5 py-1.5 text-[7px] font-bold uppercase tracking-[0.08em] text-wine transition hover:bg-wine/10"
-                  >
-                    <Upload className="h-2.5 w-2.5" />
-                    Add more
-                  </button>
-                ) : (
-                  <span className="text-[7px] font-bold uppercase tracking-[0.08em] text-emerald">
-                    Maximum reached
-                  </span>
-                )}
-              </div>
-            )}
+          {/* =================================================== */}
+          {/* ERROR                                                 */}
+          {/* =================================================== */}
 
-            <input
-              ref={
-                fileInputRef
+          {error && (
+            <div className="mt-2.5 rounded-[14px] bg-wine/5 px-3 py-2">
+              <p className="text-[8px] leading-3.5 text-wine">
+                {error}
+              </p>
+            </div>
+          )}
+
+          {/* =================================================== */}
+          {/* FOOTER                                                */}
+          {/* =================================================== */}
+
+          <div className="mt-3 flex gap-1.5">
+            <button
+              type="button"
+              onClick={
+                onClose
               }
-              type="file"
-              multiple
-              accept={
-                isPreWedding
-                  ? 'image/jpeg,image/png,image/webp,image/heic,image/heif'
-                  : 'image/jpeg,image/png,image/webp,image/heic,image/heif,video/mp4,video/webm,video/quicktime'
+              className="flex-1 rounded-full border border-sand-dark/70 bg-white px-2 py-2.5 text-[8px] font-bold uppercase tracking-[0.1em] text-ink-soft transition hover:bg-sand"
+            >
+              Cancel
+            </button>
+
+            <button
+              type="button"
+              onClick={
+                upload
               }
               disabled={
-                uploading ||
-                !canAddMore
+                files.length ===
+                  0 ||
+                (isPreWedding &&
+                  !tokenValue.trim())
               }
-              onChange={
-                handleFileSelection
-              }
-              className="sr-only"
-            />
+              className="flex flex-[1.5] items-center justify-center gap-1 rounded-full bg-wine px-2 py-2.5 text-[8px] font-bold uppercase tracking-[0.1em] text-white shadow-sm transition hover:bg-wine/90 disabled:cursor-not-allowed disabled:opacity-35"
+            >
+              <Check className="h-3 w-3" />
 
-            <input
-              ref={
-                replaceInputRef
-              }
-              type="file"
-              accept={
-                isPreWedding
-                  ? 'image/jpeg,image/png,image/webp,image/heic,image/heif'
-                  : 'image/jpeg,image/png,image/webp,image/heic,image/heif,video/mp4,video/webm,video/quicktime'
-              }
-              disabled={
-                uploading
-              }
-              onChange={
-                handleReplaceSelection
-              }
-              className="sr-only"
-            />
-
-            {/* ================================================= */}
-            {/* ERROR                                               */}
-            {/* ================================================= */}
-
-            {error && (
-              <div className="mt-2.5 rounded-[14px] bg-wine/5 px-3 py-2">
-                <p className="text-[8px] leading-3.5 text-wine">
-                  {error}
-                </p>
-              </div>
-            )}
-
-            {/* ================================================= */}
-            {/* FOOTER                                              */}
-            {/* ================================================= */}
-
-            <div className="mt-3 flex gap-1.5">
-              <button
-                type="button"
-                onClick={
-                  onClose
-                }
-                disabled={
-                  uploading
-                }
-                className="flex-1 rounded-full border border-sand-dark/70 bg-white px-2 py-2.5 text-[8px] font-bold uppercase tracking-[0.1em] text-ink-soft transition hover:bg-sand disabled:cursor-not-allowed disabled:opacity-40"
-              >
-                Cancel
-              </button>
-
-              <button
-                type="button"
-                onClick={
-                  upload
-                }
-                disabled={
-                  uploading ||
-                  files.length ===
-                    0 ||
-                  (isPreWedding &&
-                    !tokenValue.trim())
-                }
-                className="flex flex-[1.5] items-center justify-center gap-1 rounded-full bg-wine px-2 py-2.5 text-[8px] font-bold uppercase tracking-[0.1em] text-white shadow-sm transition hover:bg-wine/90 disabled:cursor-not-allowed disabled:opacity-35"
-              >
-                {isPreWedding
-                  ? (
-                    <>
-                      <Check className="h-3 w-3" />
-                      Upload{' '}
-                      {
-                        files.length
-                      }{' '}
-                      {files.length ===
-                      1
-                        ? 'Photograph'
-                        : 'Photographs'}
-                    </>
-                  )
-                  : (
-                    <>
-                      <Upload className="h-3 w-3" />
-                      Upload{' '}
-                      {
-                        files.length
-                      }{' '}
-                      {files.length ===
-                      1
-                        ? 'Memory'
-                        : 'Memories'}
-                    </>
-                  )}
-              </button>
-            </div>
-
-            <div className="mt-2 flex items-center justify-center gap-1.5 text-center text-[7px] leading-3.5 text-ink-soft/70">
-              <ChevronDown className="h-2.5 w-2.5" />
-              <span>
-                You can review, replace or remove any selected item before uploading.
-              </span>
-            </div>
+              {isPreWedding
+                ? `Upload ${
+                    files.length
+                  } ${
+                    files.length ===
+                    1
+                      ? 'Photograph'
+                      : 'Photographs'
+                  }`
+                : `Upload ${
+                    files.length
+                  } ${
+                    files.length ===
+                    1
+                      ? 'Memory'
+                      : 'Memories'
+                  }`}
+            </button>
           </div>
-        )}
+
+          <div className="mt-2 flex items-center justify-center gap-1.5 text-center text-[7px] leading-3.5 text-ink-soft/70">
+            <ChevronDown className="h-2.5 w-2.5" />
+
+            <span>
+              You can review, replace or remove any selected item before uploading.
+            </span>
+          </div>
+        </div>
       </div>
     </div>,
     document.body,
   );
 }
-
-/* ============================================================= */
-/* HELPERS                                                         */
-/* ============================================================= */
 
 function formatFileSize(
   bytes: number,
@@ -2182,7 +1479,8 @@ function formatFileSize(
     1024 * 1024
   ) {
     return `${(
-      bytes / 1024
+      bytes /
+      1024
     ).toFixed(1)} KB`;
   }
 
