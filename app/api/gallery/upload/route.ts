@@ -188,6 +188,8 @@ async function ensureCloudinaryLogo(): Promise<string> {
 /* BRANDED IMAGE URL                                              */
 /* ============================================================= */
 
+// src/app/api/gallery/upload/route.ts
+
 function createBrandedImageUrl(
   publicId: string,
 ): string {
@@ -197,26 +199,42 @@ function createBrandedImageUrl(
       secure: true,
       resource_type: 'image',
       transformation: [
+        /*
+         * Logo layer.
+         *
+         * Cloudinary overlay IDs containing /
+         * must use : in transformation syntax.
+         */
         {
           width: 120,
           crop: 'scale',
+          overlay:
+            'oasis26:branding:logo',
+        },
+        {
+          flags: 'layer_apply',
           gravity: 'north_west',
           x: 24,
           y: 24,
-          overlay:
-            CLOUDINARY_LOGO_PUBLIC_ID,
         },
+
+        /*
+         * OASIS'26 text layer.
+         */
         {
           color: 'white',
-          gravity: 'north_west',
-          x: 154,
-          y: 62,
           overlay: {
             font_family: 'Arial',
             font_size: 30,
             font_weight: 'bold',
             text: "OASIS'26",
           },
+        },
+        {
+          flags: 'layer_apply',
+          gravity: 'north_west',
+          x: 154,
+          y: 62,
         },
       ],
     },
