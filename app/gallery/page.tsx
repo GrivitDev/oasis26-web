@@ -26,6 +26,11 @@ import {
   useSearchParams,
 } from 'next/navigation';
 
+import {
+  MAX_SELECTION_COUNT,
+  validateGalleryUploadFile,
+} from '@/lib/gallery';
+
 import GalleryCamera from '@/components/gallery/gallery-camera';
 import GalleryGrid from '@/components/gallery/gallery-grid';
 import GalleryMediaViewer from '@/components/gallery/gallery-media-viewer';
@@ -43,34 +48,6 @@ type SelectedGalleryFile = {
   file: File;
   previewUrl: string;
 };
-
-const MAX_SELECTION_COUNT = 25;
-
-const MAX_IMAGE_SIZE =
-  40 * 1024 * 1024;
-
-const MAX_VIDEO_SIZE =
-  80 * 1024 * 1024;
-
-const ALLOWED_IMAGE_TYPES =
-  new Set([
-    'image/jpeg',
-    'image/png',
-    'image/webp',
-    'image/heic',
-    'image/heif',
-  ]);
-
-const ALLOWED_VIDEO_TYPES =
-  new Set([
-    'video/mp4',
-    'video/webm',
-    'video/quicktime',
-  ]);
-
-const PREWEDDING_UPLOAD_TOKEN =
-  process.env
-    .NEXT_PUBLIC_PREWEDDING_UPLOAD_TOKEN?.trim() ?? '';
 
 export default function GalleryPage() {
   return (
@@ -92,10 +69,7 @@ function GalleryPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  const {
-    startUpload,
-    isUploading,
-  } = useGalleryUpload();
+  const { startUpload } = useGalleryUpload();
 
   const sectionParam =
     searchParams.get('section');
@@ -116,6 +90,9 @@ function GalleryPageContent() {
       null,
     );
 
+  const [likeOverrides, setLikeOverrides] =
+    useState<Record<string, number>>({});
+
   const [uploadOpen, setUploadOpen] =
     useState(false);
 
@@ -134,6 +111,11 @@ function GalleryPageContent() {
       );
     };
   }, []);
+
+  useEffect(() => {
+    setLikeOverrides({});
+    setViewerItem(null);
+  }, [section]);
 
   useEffect(() => {
     function handleUploadComplete(
@@ -213,7 +195,20 @@ function GalleryPageContent() {
           <GalleryGrid
             section={section}
             refreshKey={refreshKey}
-            onOpen={setViewerItem}
+            onOpen={(item) => {
+              setViewerItem({
+                ...item,
+                likes:
+                  likeOverrides[item.id] ?? item.likes,
+              });
+            }}
+            likeOverrides={likeOverrides}
+            onLikeChange={(itemId, likes) => {
+              setLikeOverrides((current) => ({
+                ...current,
+                [itemId]: likes,
+              }));
+            }}
           />
         </div>
       </div>
@@ -240,7 +235,6 @@ function GalleryPageContent() {
               onClick={() =>
                 setUploadOpen(true)
               }
-              disabled={isUploading}
               className="pointer-events-auto flex h-12 w-12 items-center justify-center rounded-full border border-white/70 bg-wine text-white shadow-[0_8px_24px_rgba(0,0,0,0.16)] backdrop-blur-md transition duration-300 hover:-translate-y-1 hover:shadow-[0_12px_30px_rgba(0,0,0,0.2)] disabled:cursor-not-allowed disabled:opacity-50 sm:h-14 sm:w-14"
               aria-label={
                 section === 'pre-wedding'
@@ -262,7 +256,6 @@ function GalleryPageContent() {
       {cameraOpen &&
         section === 'live' && (
           <GalleryCamera
-            onUploaded={refreshPage}
             onClose={() =>
               setCameraOpen(false)
             }
@@ -272,6 +265,17 @@ function GalleryPageContent() {
       {viewerItem && (
         <GalleryMediaViewer
           item={viewerItem}
+          onLikeChange={(itemId, likes) => {
+            setLikeOverrides((current) => ({
+              ...current,
+              [itemId]: likes,
+            }));
+            setViewerItem((current) =>
+              current && current.id === itemId
+                ? { ...current, likes }
+                : current,
+            );
+          }}
           onClose={() =>
             setViewerItem(null)
           }
@@ -284,7 +288,7 @@ function GalleryPageContent() {
           onClose={() =>
             setUploadOpen(false)
           }
-          onStartUpload={(files) => {
+          onStartUpload={(files, uploadToken) => {
             /*
              * The upload provider owns the
              * background queue and status bar.
@@ -296,6 +300,7 @@ function GalleryPageContent() {
             startUpload(
               section,
               files,
+              uploadToken,
             );
 
             setUploadOpen(false);
@@ -320,6 +325,7 @@ type GalleryUploadModalProps = {
       id: string;
       file: File;
     }>,
+    uploadToken?: string,
   ) => void;
 };
 
@@ -417,55 +423,8 @@ function GalleryUploadModal({
     };
   }, [onClose]);
 
-  function validateFile(
-    selectedFile: File,
-  ): string | null {
-    const isVideo =
-      selectedFile.type.startsWith(
-        'video/',
-      );
-
-    if (
-      isPreWedding &&
-      isVideo
-    ) {
-      return 'Videos are not allowed in the pre-wedding gallery.';
-    }
-
-    if (
-      !isPreWedding &&
-      isVideo &&
-      !ALLOWED_VIDEO_TYPES.has(
-        selectedFile.type,
-      )
-    ) {
-      return 'Please select an MP4, WebM, or MOV video.';
-    }
-
-    if (
-      !isVideo &&
-      !ALLOWED_IMAGE_TYPES.has(
-        selectedFile.type,
-      )
-    ) {
-      return 'Please select a JPEG, PNG, WebP, HEIC, or HEIF image.';
-    }
-
-    const maxSize =
-      isVideo
-        ? MAX_VIDEO_SIZE
-        : MAX_IMAGE_SIZE;
-
-    if (
-      selectedFile.size >
-      maxSize
-    ) {
-      return isVideo
-        ? 'This video is too large. The maximum video size is 80 MB.'
-        : 'This image is too large. The maximum image size is 40 MB.';
-    }
-
-    return null;
+  function validateFile(selectedFile: File): string | null {
+    return validateGalleryUploadFile(selectedFile, section);
   }
 
   function createSelectedFile(
@@ -837,21 +796,7 @@ function GalleryUploadModal({
   }
 
   function isTokenValid() {
-    if (!isPreWedding) {
-      return true;
-    }
-
-    const suppliedToken =
-      tokenValue.trim();
-
-    return (
-      suppliedToken.length >
-        0 &&
-      PREWEDDING_UPLOAD_TOKEN.length >
-        0 &&
-      suppliedToken ===
-        PREWEDDING_UPLOAD_TOKEN
-    );
+    return !isPreWedding || tokenValue.trim().length > 0;
   }
 
   function upload() {
@@ -880,12 +825,7 @@ function GalleryUploadModal({
       isPreWedding &&
       !isTokenValid()
     ) {
-      setError(
-        PREWEDDING_UPLOAD_TOKEN
-          ? 'Invalid pre-wedding upload token.'
-          : 'The pre-wedding upload token is not configured.',
-      );
-
+      setError('Enter the private pre-wedding upload token to continue.');
       return;
     }
 
@@ -913,6 +853,7 @@ function GalleryUploadModal({
      */
     onStartUpload(
       uploadFiles,
+      isPreWedding ? tokenValue.trim() : undefined,
     );
 
     /*
@@ -1041,7 +982,7 @@ function GalleryUploadModal({
               </div>
 
               <input
-                type="text"
+                type="password"
                 value={tokenValue}
                 onChange={(event) => {
                   setTokenValue(
@@ -1142,6 +1083,7 @@ function GalleryUploadModal({
                                 muted
                                 playsInline
                                 controls
+                                preload="metadata"
                                 className="h-full w-full object-cover"
                               />
                             ) : (

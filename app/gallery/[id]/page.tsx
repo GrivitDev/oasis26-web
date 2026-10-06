@@ -9,11 +9,11 @@ import {
   Download,
   Heart,
   Play,
-  Share2,
 } from 'lucide-react';
 import { ObjectId } from 'mongodb';
 
 import clientPromise from '@/lib/mongodb';
+import GalleryShareButton from '@/components/gallery/gallery-share-button';
 import {
   toGalleryItemResponse,
   type GalleryItemDocument,
@@ -81,12 +81,13 @@ export async function generateMetadata({
   const mediaUrl =
     item.secureUrl;
 
-  const siteUrl =
+  const siteUrl = (
     process.env.NEXT_PUBLIC_SITE_URL ??
-    'http://localhost:3000';
+    'http://localhost:3000'
+  ).replace(/\/+$/, '');
 
   const pageUrl =
-    `${siteUrl}/gallery/media/${item.id}`;
+    `${siteUrl}/gallery/${item.id}`;
 
   return {
     title,
@@ -171,8 +172,6 @@ export default async function GalleryMediaPage({
   const downloadHref =
     `/api/gallery/${item.id}/download`;
 
-  const shareHref =
-    `/gallery/media/${item.id}#share`;
 
   return (
     <main className="min-h-screen bg-cream px-2.5 pb-8 pt-20 sm:px-5 sm:pb-10 sm:pt-24">
@@ -272,13 +271,11 @@ export default async function GalleryMediaPage({
                 Download
               </a>
 
-              <a
-                href={shareHref}
-                className="inline-flex h-8 items-center gap-1.5 rounded-full bg-wine px-3 text-[8px] font-bold uppercase tracking-[0.1em] text-white shadow-sm transition hover:bg-wine/90 sm:h-9 sm:px-3.5 sm:text-[9px]"
-              >
-                <Share2 className="h-3.5 w-3.5" />
-                Share
-              </a>
+              <GalleryShareButton
+                mediaId={item.id}
+                showLabel
+                className="h-8 bg-wine px-3 text-[8px] font-bold uppercase tracking-[0.1em] text-white hover:bg-wine/90 sm:h-9 sm:px-3.5 sm:text-[9px]"
+              />
 
               <div
                 className="inline-flex h-8 items-center gap-1 rounded-full bg-cream px-2.5 text-[9px] font-semibold text-wine sm:h-9 sm:px-3 sm:text-[10px]"

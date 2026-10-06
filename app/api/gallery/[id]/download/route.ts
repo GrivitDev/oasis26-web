@@ -1,160 +1,111 @@
-import {
-  NextResponse,
-} from 'next/server';
-
-import {
-  ObjectId,
-} from 'mongodb';
+import { NextResponse } from 'next/server';
+import { ObjectId } from 'mongodb';
 
 import clientPromise from '@/lib/mongodb';
+import cloudinary from '@/lib/cloudinary';
 
 export const runtime = 'nodejs';
 
-type RouteContext = {
+ type RouteContext = {
   params: Promise<{
     id: string;
   }>;
 };
+
+function sanitizeFilename(value: string): string {
+  return value
+    .replace(/["\\]/g, '_')
+    .replace(/[\r\n]/g, '_')
+    .trim()
+    .slice(0, 180);
+}
 
 export async function GET(
   _request: Request,
   context: RouteContext,
 ) {
   try {
-    const { id } =
-      await context.params;
+    const { id } = await context.params;
 
     if (!ObjectId.isValid(id)) {
       return NextResponse.json(
-        {
-          error:
-            'Invalid gallery item.',
-        },
-        {
-          status: 400,
-        },
+        { error: 'Invalid gallery item.' },
+        { status: 400 },
       );
     }
 
-    const client =
-      await clientPromise;
+    const client = await clientPromise;
+    const db = client.db(process.env.MONGODB_DB);
 
-    const db =
-      client.db(
-        process.env.MONGODB_DB,
-      );
-
-    const item =
-      await db
-        .collection('gallery')
-        .findOne({
-          _id:
-            new ObjectId(id),
-        });
+    const item = await db
+      .collection('gallery')
+      .findOne({ _id: new ObjectId(id) });
 
     if (!item) {
       return NextResponse.json(
-        {
-          error:
-            'Gallery item not found.',
-        },
-        {
-          status: 404,
-        },
+        { error: 'Gallery item not found.' },
+        { status: 404 },
       );
     }
 
     if (
-      typeof item.secureUrl !==
-      'string'
+      typeof item.publicId !== 'string' ||
+      (item.resourceType !== 'image' && item.resourceType !== 'video')
     ) {
       return NextResponse.json(
-        {
-          error:
-            'Gallery media URL is unavailable.',
-        },
-        {
-          status: 404,
-        },
+        { error: 'Gallery media is unavailable.' },
+        { status: 404 },
       );
     }
 
-    const mediaResponse =
-      await fetch(
-        item.secureUrl,
-      );
+    const mediaUrl = cloudinary.url(item.publicId, {
+      secure: true,
+      resource_type: item.resourceType,
+    });
 
-    if (!mediaResponse.ok) {
+    const mediaResponse = await fetch(mediaUrl, {
+      cache: 'no-store',
+    });
+
+    if (!mediaResponse.ok || !mediaResponse.body) {
       return NextResponse.json(
-        {
-          error:
-            'Unable to retrieve gallery media.',
-        },
-        {
-          status: 502,
-        },
+        { error: 'Unable to retrieve gallery media.' },
+        { status: 502 },
       );
     }
 
     const contentType =
-      mediaResponse.headers.get(
-        'content-type',
-      ) ??
-      (
-        item.resourceType ===
-        'video'
-          ? 'video/mp4'
-          : 'image/jpeg'
-      );
+      mediaResponse.headers.get('content-type') ??
+      (item.resourceType === 'video' ? 'video/mp4' : 'image/jpeg');
 
-    const arrayBuffer =
-      await mediaResponse.arrayBuffer();
+    const contentLength = mediaResponse.headers.get('content-length');
 
-    const safeFilename =
-      typeof item.originalFilename ===
-        'string' &&
-      item.originalFilename.length > 0
+    const filename = sanitizeFilename(
+      typeof item.originalFilename === 'string' && item.originalFilename
         ? item.originalFilename
-        : `oasis26-${id}.${
-            item.resourceType ===
-            'video'
-              ? 'mp4'
-              : 'jpg'
-          }`;
-
-    return new NextResponse(
-      arrayBuffer,
-      {
-        status: 200,
-        headers: {
-          'Content-Type':
-            contentType,
-
-          'Content-Disposition':
-            `attachment; filename="${safeFilename.replace(
-              /["\\]/g,
-              '_',
-            )}"`,
-
-          'Cache-Control':
-            'private, no-store',
-        },
-      },
+        : `oasis26-${id}.${item.resourceType === 'video' ? 'mp4' : 'jpg'}`,
     );
+
+    const headers = new Headers({
+      'Content-Type': contentType,
+      'Content-Disposition': `attachment; filename="${filename}"`,
+      'Cache-Control': 'private, no-store',
+    });
+
+    if (contentLength) {
+      headers.set('Content-Length', contentLength);
+    }
+
+    return new NextResponse(mediaResponse.body, {
+      status: 200,
+      headers,
+    });
   } catch (error) {
-    console.error(
-      'Gallery download error:',
-      error,
-    );
+    console.error('Gallery download error:', error);
 
     return NextResponse.json(
-      {
-        error:
-          'Unable to download this gallery item.',
-      },
-      {
-        status: 500,
-      },
+      { error: 'Unable to download this gallery item.' },
+      { status: 500 },
     );
   }
 }

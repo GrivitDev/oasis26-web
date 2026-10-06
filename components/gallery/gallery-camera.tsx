@@ -6,153 +6,102 @@ import {
   Camera,
   Check,
   FlipHorizontal2,
-  ImagePlus,
   Loader2,
   Mic,
-  RotateCcw,
   Square,
-  UploadCloud,
   Video,
   X,
   Zap,
   ZoomIn,
 } from 'lucide-react';
-import {
-  createPortal,
-} from 'react-dom';
+import { createPortal } from 'react-dom';
 import {
   useCallback,
   useEffect,
+  useMemo,
   useRef,
   useState,
+  useSyncExternalStore,
 } from 'react';
 
+import { useGalleryUpload } from './gallery-upload-provider';
+
 type GalleryCameraProps = {
-  onUploaded?: () => void;
   onClose?: () => void;
 };
 
 type CameraMode = 'photo' | 'video';
 
-type UploadStatus =
-  | 'queued'
-  | 'uploading'
-  | 'uploaded'
-  | 'failed';
-
-type UploadQueueItem = {
-  id: string;
-  file: File;
-  status: UploadStatus;
-  progress: number;
-  error?: string;
-};
-
-type CameraTrackCapabilities = MediaTrackCapabilities & {
+type ExtendedMediaTrackCapabilities = MediaTrackCapabilities & {
   torch?: boolean;
   zoom?: {
     min: number;
     max: number;
-    step: number;
+    step?: number;
   };
 };
 
-export default function GalleryCamera({
-  onUploaded,
-  onClose,
-}: GalleryCameraProps) {
-  const videoRef =
-    useRef<HTMLVideoElement | null>(null);
+type ExtendedMediaTrackConstraintSet = MediaTrackConstraintSet & {
+  torch?: boolean;
+  zoom?: number;
+};
 
-  const streamRef =
-    useRef<MediaStream | null>(null);
+const subscribeToMount = () => () => {};
+const getClientSnapshot = () => true;
+const getServerSnapshot = () => false;
 
-  const mediaRecorderRef =
-    useRef<MediaRecorder | null>(null);
+function createCaptureId(prefix: string) {
+  if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
+    return `${prefix}-${crypto.randomUUID()}`;
+  }
 
-  const recordedChunksRef =
-    useRef<Blob[]>([]);
+  return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
 
-  const timerRef =
-    useRef<ReturnType<typeof setInterval> | null>(
-      null,
-    );
+export default function GalleryCamera({ onClose }: GalleryCameraProps) {
+  const { startUpload } = useGalleryUpload();
 
-  const mountedRef =
-    useRef(false);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const recordedChunksRef = useRef<Blob[]>([]);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const activeDeviceIdRef = useRef<string | null>(null);
+  const closeButtonRef = useRef<HTMLButtonElement | null>(null);
+  const mountedRef = useRef(false);
 
-  const uploadQueueRef =
-    useRef<UploadQueueItem[]>([]);
-
-  const activeUploadsRef =
-    useRef(0);
-
-  const processUploadQueueRef =
-    useRef<(() => Promise<void>) | null>(null);
-
-  const [mounted, setMounted] =
-    useState(false);
-
-  const [mode, setMode] =
-    useState<CameraMode>('photo');
-
-  const [facingMode, setFacingMode] =
-    useState<'user' | 'environment'>(
-      'environment',
-    );
-
-  const [cameraReady, setCameraReady] =
-    useState(false);
-
-  const [cameraError, setCameraError] =
-    useState('');
-
-  const [recording, setRecording] =
-    useState(false);
-
-  const [recordingSeconds, setRecordingSeconds] =
-    useState(0);
-
-  const [uploadQueue, setUploadQueue] =
-    useState<UploadQueueItem[]>([]);
-
-  const [uploadMessage, setUploadMessage] =
-    useState('');
-
-  const [uploadError, setUploadError] =
-    useState('');
-
-  const [flashSupported, setFlashSupported] =
-    useState(false);
-
-  const [flashEnabled, setFlashEnabled] =
-    useState(false);
-
-  const [zoomSupported, setZoomSupported] =
-    useState(false);
-
-  const [zoomMin, setZoomMin] =
-    useState(1);
-
-  const [zoomMax, setZoomMax] =
-    useState(1);
-
-  const [zoomStep, setZoomStep] =
-    useState(0.1);
-
-  const [zoom, setZoom] =
-    useState(1);
+  const mounted = useSyncExternalStore(
+    subscribeToMount,
+    getClientSnapshot,
+    getServerSnapshot,
+  );
+  const [mode, setMode] = useState<CameraMode>('photo');
+  const [facingMode, setFacingMode] = useState<'user' | 'environment'>('environment');
+  const [hasActiveDevice, setHasActiveDevice] = useState(false);
+  const [cameraReady, setCameraReady] = useState(false);
+  const [cameraError, setCameraError] = useState('');
+  const [recording, setRecording] = useState(false);
+  const [recordingSeconds, setRecordingSeconds] = useState(0);
+  const [flashSupported, setFlashSupported] = useState(false);
+  const [flashEnabled, setFlashEnabled] = useState(false);
+  const [zoomSupported, setZoomSupported] = useState(false);
+  const [zoomMin, setZoomMin] = useState(1);
+  const [zoomMax, setZoomMax] = useState(1);
+  const [zoomStep, setZoomStep] = useState(0.1);
+  const [zoom, setZoom] = useState(1);
+  const [starting, setStarting] = useState(true);
+  const [message, setMessage] = useState('');
+  const [cameraCount, setCameraCount] = useState(1);
+  const [captureBusy, setCaptureBusy] = useState(false);
 
   const stopCamera = useCallback(() => {
     if (streamRef.current) {
-      streamRef.current
-        .getTracks()
-        .forEach((track) => track.stop());
-
+      streamRef.current.getTracks().forEach((track) => track.stop());
       streamRef.current = null;
     }
 
     if (videoRef.current) {
+      videoRef.current.pause();
       videoRef.current.srcObject = null;
     }
 
@@ -166,809 +115,427 @@ export default function GalleryCamera({
     setZoom(1);
   }, []);
 
-  const inspectCameraCapabilities =
-    useCallback(
-      (stream: MediaStream) => {
-        const videoTrack =
-          stream.getVideoTracks()[0];
+  const inspectCameraCapabilities = useCallback((stream: MediaStream) => {
+    const track = stream.getVideoTracks()[0];
 
-        if (!videoTrack) {
-          return;
-        }
+    if (!track) {
+      return;
+    }
 
-        const capabilities =
-          videoTrack.getCapabilities() as CameraTrackCapabilities;
+    const capabilities =
+      track.getCapabilities() as ExtendedMediaTrackCapabilities;
 
-        const hasTorch =
-          capabilities.torch === true;
+    const torch = capabilities.torch === true;
+    setFlashSupported(torch);
+    if (!torch) setFlashEnabled(false);
 
-        setFlashSupported(hasTorch);
+    if (
+      capabilities.zoom &&
+      Number.isFinite(capabilities.zoom.min) &&
+      Number.isFinite(capabilities.zoom.max) &&
+      capabilities.zoom.max > capabilities.zoom.min
+    ) {
+      setZoomSupported(true);
+      setZoomMin(capabilities.zoom.min);
+      setZoomMax(capabilities.zoom.max);
+      setZoomStep(capabilities.zoom.step || 0.1);
+      setZoom(capabilities.zoom.min);
+    } else {
+      setZoomSupported(false);
+    }
+  }, []);
 
-        if (!hasTorch) {
-          setFlashEnabled(false);
-        }
+  const enumerateCameras = useCallback(async () => {
+    if (!navigator.mediaDevices?.enumerateDevices) {
+      setCameraCount(1);
+      return [] as MediaDeviceInfo[];
+    }
 
-        if (
-          capabilities.zoom &&
-          Number.isFinite(
-            capabilities.zoom.min,
-          ) &&
-          Number.isFinite(
-            capabilities.zoom.max,
-          ) &&
-          capabilities.zoom.max >
-            capabilities.zoom.min
-        ) {
-          setZoomSupported(true);
-          setZoomMin(
-            capabilities.zoom.min,
-          );
-          setZoomMax(
-            capabilities.zoom.max,
-          );
-          setZoomStep(
-            capabilities.zoom.step ||
-              0.1,
-          );
-          setZoom(
-            capabilities.zoom.min,
-          );
-        } else {
-          setZoomSupported(false);
-        }
-      },
-      [],
-    );
+    try {
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      const cameras = devices.filter((device) => device.kind === 'videoinput');
+      setCameraCount(Math.max(1, cameras.length));
+      return cameras;
+    } catch {
+      setCameraCount(1);
+      return [] as MediaDeviceInfo[];
+    }
+  }, []);
 
   const startCamera = useCallback(async () => {
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setCameraError('Camera access is not supported by this browser.');
+      setStarting(false);
+      return;
+    }
+
+    stopCamera();
+    setCameraError('');
+    setMessage('');
+    setStarting(true);
+
+    const wantsAudio = mode === 'video';
+
+    const preferredVideo: MediaTrackConstraints = activeDeviceIdRef.current
+      ? {
+          deviceId: { exact: activeDeviceIdRef.current },
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
+          frameRate: { ideal: 30, max: 30 },
+        }
+      : {
+          facingMode: { ideal: facingMode },
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
+          frameRate: { ideal: 30, max: 30 },
+        };
+
+    const primaryConstraints: MediaStreamConstraints = {
+      video: preferredVideo,
+      audio: wantsAudio
+        ? {
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true,
+          }
+        : false,
+    };
+
+    const fallbackConstraints: MediaStreamConstraints = {
+      video: true,
+      audio: wantsAudio,
+    };
+
+    let stream: MediaStream;
+
     try {
-      setCameraError('');
+      stream = await navigator.mediaDevices.getUserMedia(primaryConstraints);
+    } catch (primaryError) {
+      try {
+        stream = await navigator.mediaDevices.getUserMedia(fallbackConstraints);
+        activeDeviceIdRef.current = null;
+        setHasActiveDevice(false);
+      } catch (fallbackError) {
+        console.error('Camera access error:', primaryError, fallbackError);
 
-      stopCamera();
+        const source = fallbackError instanceof DOMException ? fallbackError : primaryError;
+        const code = source instanceof DOMException ? source.name : '';
 
-      if (
-        !navigator.mediaDevices ||
-        !navigator.mediaDevices.getUserMedia
-      ) {
         setCameraError(
-          'Camera access is not supported by this browser.',
+          code === 'NotAllowedError'
+            ? 'Camera permission was denied. Allow camera access in your browser settings and try again.'
+            : code === 'NotFoundError'
+              ? 'No camera was found on this device.'
+              : code === 'NotReadableError'
+                ? 'The camera is busy or unavailable. Close other apps using it and try again.'
+                : 'Unable to start the camera. Please try again.',
         );
-
+        setStarting(false);
         return;
       }
+    }
 
-      const stream =
-        await navigator.mediaDevices.getUserMedia(
-          {
-            video: {
-              facingMode,
-              width: {
-                ideal: 1280,
-              },
-              height: {
-                ideal: 720,
-              },
-            },
-            audio: true,
-          },
-        );
+    streamRef.current = stream;
+    inspectCameraCapabilities(stream);
+    await enumerateCameras();
 
-      streamRef.current = stream;
+    const video = videoRef.current;
+    if (!video) {
+      stream.getTracks().forEach((track) => track.stop());
+      streamRef.current = null;
+      setStarting(false);
+      return;
+    }
 
-      if (videoRef.current) {
-        videoRef.current.srcObject =
-          stream;
+    video.srcObject = stream;
+    video.muted = true;
+    video.playsInline = true;
 
-        await videoRef.current.play();
+    try {
+      if (video.readyState < HTMLMediaElement.HAVE_METADATA) {
+        await new Promise<void>((resolve) => {
+          const onLoadedMetadata = () => {
+            video.removeEventListener('loadedmetadata', onLoadedMetadata);
+            resolve();
+          };
+
+          video.addEventListener('loadedmetadata', onLoadedMetadata, {
+            once: true,
+          });
+        });
       }
 
-      inspectCameraCapabilities(
-        stream,
-      );
-
+      await video.play();
       setCameraReady(true);
     } catch (error) {
-      console.error(
-        'Camera access error:',
-        error,
-      );
-
-      setCameraReady(false);
-
-      if (
-        error instanceof DOMException &&
-        error.name === 'NotAllowedError'
-      ) {
-        setCameraError(
-          'Camera and microphone access was denied. Please allow access in your browser settings.',
-        );
-      } else if (
-        error instanceof DOMException &&
-        error.name === 'NotFoundError'
-      ) {
-        setCameraError(
-          'No camera or microphone was found on this device.',
-        );
-      } else {
-        setCameraError(
-          'Unable to access the camera. Please check your browser permissions.',
-        );
-      }
+      console.error('Camera preview error:', error);
+      setCameraError('The camera opened but the preview could not start.');
+      stopCamera();
+    } finally {
+      setStarting(false);
     }
-  }, [
-    facingMode,
-    inspectCameraCapabilities,
-    stopCamera,
-  ]);
+  }, [enumerateCameras, facingMode, inspectCameraCapabilities, mode, stopCamera]);
 
   useEffect(() => {
     mountedRef.current = true;
-
-    const mountTimeout = setTimeout(() => {
-      setMounted(true);
-    }, 0);
-
-    const previousOverflow =
-      document.body.style.overflow;
-
-    document.body.style.overflow =
-      'hidden';
-
     return () => {
       mountedRef.current = false;
+      stopCamera();
+    };
+  }, [stopCamera]);
 
-      clearTimeout(mountTimeout);
+  useEffect(() => {
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    closeButtonRef.current?.focus();
 
-      document.body.style.overflow =
-        previousOverflow;
+    return () => {
+      document.body.style.overflow = previousOverflow;
     };
   }, []);
 
   useEffect(() => {
-    const startCameraTimeout =
-      setTimeout(() => {
-        void startCamera();
-      }, 0);
+    if (!mounted) return;
 
-    return () => {
-      clearTimeout(
-        startCameraTimeout,
-      );
-
-      if (timerRef.current) {
-        clearInterval(
-          timerRef.current,
-        );
-
-        timerRef.current = null;
-      }
-
-      const recorder =
-        mediaRecorderRef.current;
-
-      if (
-        recorder &&
-        recorder.state !== 'inactive'
-      ) {
-        recorder.onstop = null;
-        recorder.onerror = null;
-        recorder.stop();
-      }
-
-      mediaRecorderRef.current =
-        null;
-
-      stopCamera();
-    };
-  }, [startCamera, stopCamera]);
-
-  useEffect(() => {
-    if (!recording) {
-      return;
-    }
-
-    timerRef.current =
-      setInterval(() => {
-        setRecordingSeconds(
-          (current) => current + 1,
-        );
-      }, 1000);
-
-    return () => {
-      if (timerRef.current) {
-        clearInterval(
-          timerRef.current,
-        );
-
-        timerRef.current = null;
-      }
-    };
-  }, [recording]);
-
-  const updateQueueItem = useCallback(
-    (
-      id: string,
-      updates: Partial<UploadQueueItem>,
-    ) => {
-      uploadQueueRef.current =
-        uploadQueueRef.current.map(
-          (item) =>
-            item.id === id
-              ? {
-                  ...item,
-                  ...updates,
-                }
-              : item,
-        );
-
-      if (mountedRef.current) {
-        setUploadQueue(
-          [...uploadQueueRef.current],
-        );
-      }
-    },
-    [],
-  );
-
-  const processUploadQueue =
-    useCallback(async () => {
-      while (
-        activeUploadsRef.current <
-          2
-      ) {
-        const nextItem =
-          uploadQueueRef.current.find(
-            (item) =>
-              item.status === 'queued',
-          );
-
-        if (!nextItem) {
-          break;
-        }
-
-        activeUploadsRef.current += 1;
-
-        updateQueueItem(
-          nextItem.id,
-          {
-            status: 'uploading',
-            progress: 0,
-            error: undefined,
-          },
-        );
-
-        try {
-          const formData =
-            new FormData();
-
-          formData.append(
-            'file',
-            nextItem.file,
-          );
-
-          formData.append(
-            'section',
-            'live',
-          );
-
-          await new Promise<void>(
-            (
-              resolve,
-              reject,
-            ) => {
-              const xhr =
-                new XMLHttpRequest();
-
-              xhr.open(
-                'POST',
-                '/api/gallery/upload',
-              );
-
-              xhr.upload.onprogress =
-                (event) => {
-                  if (
-                    !event.lengthComputable
-                  ) {
-                    return;
-                  }
-
-                  const progress =
-                    Math.round(
-                      (event.loaded /
-                        event.total) *
-                        100,
-                    );
-
-                  updateQueueItem(
-                    nextItem.id,
-                    {
-                      progress,
-                    },
-                  );
-                };
-
-              xhr.onload = () => {
-                let response: {
-                  error?: string;
-                } = {};
-
-                try {
-                  response =
-                    JSON.parse(
-                      xhr.responseText,
-                    );
-                } catch {
-                  response = {};
-                }
-
-                if (
-                  xhr.status < 200 ||
-                  xhr.status >= 300
-                ) {
-                  reject(
-                    new Error(
-                      response.error ??
-                        'Upload failed.',
-                    ),
-                  );
-
-                  return;
-                }
-
-                resolve();
-              };
-
-              xhr.onerror = () => {
-                reject(
-                  new Error(
-                    'Network error while uploading.',
-                  ),
-                );
-              };
-
-              xhr.onabort = () => {
-                reject(
-                  new Error(
-                    'Upload was cancelled.',
-                  ),
-                );
-              };
-
-              xhr.send(
-                formData,
-              );
-            },
-          );
-
-          updateQueueItem(
-            nextItem.id,
-            {
-              status: 'uploaded',
-              progress: 100,
-            },
-          );
-
-          if (mountedRef.current) {
-            setUploadMessage(
-              'Moment added to the Live Gallery.',
-            );
-
-            setUploadError('');
-
-            onUploaded?.();
-          }
-        } catch (error) {
-          console.error(
-            'Live gallery upload error:',
-            error,
-          );
-
-          const message =
-            error instanceof Error
-              ? error.message
-              : 'Unable to upload the file.';
-
-          updateQueueItem(
-            nextItem.id,
-            {
-              status: 'failed',
-              error: message,
-            },
-          );
-
-          if (mountedRef.current) {
-            setUploadError(
-              message,
-            );
-          }
-        } finally {
-          activeUploadsRef.current -= 1;
-        }
-      }
-
-      if (
-        uploadQueueRef.current.some(
-          (item) =>
-            item.status === 'queued',
-        )
-      ) {
-        void processUploadQueueRef.current?.();
-      }
-    }, [
-      onUploaded,
-      updateQueueItem,
-    ]);
-
-  useEffect(() => {
-    processUploadQueueRef.current =
-      processUploadQueue;
-  }, [processUploadQueue]);
-
-  const queueUpload = useCallback(
-    (
-      blob: Blob,
-      filename: string,
-    ) => {
-      const id =
-        `${Date.now()}-${Math.random()
-          .toString(36)
-          .slice(2)}`;
-
-      const file =
-        new File(
-          [blob],
-          filename,
-          {
-            type:
-              blob.type ||
-              'application/octet-stream',
-          },
-        );
-
-      const item: UploadQueueItem = {
-        id,
-        file,
-        status: 'queued',
-        progress: 0,
-      };
-
-      uploadQueueRef.current = [
-        ...uploadQueueRef.current,
-        item,
-      ];
-
-      if (mountedRef.current) {
-        setUploadQueue(
-          [...uploadQueueRef.current],
-        );
-
-        setUploadMessage(
-          '',
-        );
-
-        setUploadError('');
-      }
-
-      void processUploadQueue();
-    },
-    [processUploadQueue],
-  );
-
-  function retryUpload(
-    id: string,
-  ) {
-    updateQueueItem(
-      id,
-      {
-        status: 'queued',
-        progress: 0,
-        error: undefined,
-      },
-    );
-
-    setUploadError('');
-
-    window.setTimeout(() => {
-      void processUploadQueue();
+    const startTimeout = window.setTimeout(() => {
+      void startCamera();
     }, 0);
-  }
 
-  function clearCompletedUploads() {
-    uploadQueueRef.current =
-      uploadQueueRef.current.filter(
-        (item) =>
-          item.status !==
-          'uploaded',
-      );
+    return () => window.clearTimeout(startTimeout);
+  }, [mounted, mode, startCamera]);
 
-    setUploadQueue(
-      [...uploadQueueRef.current],
-    );
-  }
+  useEffect(() => {
+    return () => {
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+      }
+    };
+  }, []);
 
-  function getSupportedVideoMimeType() {
-    const types = [
-      'video/webm;codecs=vp9,opus',
-      'video/webm;codecs=vp8,opus',
-      'video/webm',
-      'video/mp4',
-    ];
+  const closeCamera = useCallback(() => {
+    const recorder = mediaRecorderRef.current;
 
-    return (
-      types.find((type) =>
-        MediaRecorder.isTypeSupported(
-          type,
-        ),
-      ) ?? ''
-    );
-  }
-
-  function getVideoExtension(
-    mimeType: string,
-  ) {
-    if (
-      mimeType
-        .toLowerCase()
-        .includes('mp4')
-    ) {
-      return 'mp4';
+    if (recorder && recorder.state !== 'inactive') {
+      recorder.ondataavailable = null;
+      recorder.onstop = null;
+      recorder.onerror = null;
+      recorder.stop();
     }
 
-    if (
-      mimeType
-        .toLowerCase()
-        .includes('quicktime')
-    ) {
-      return 'mov';
+    mediaRecorderRef.current = null;
+    recordedChunksRef.current = [];
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
     }
-
-    return 'webm';
-  }
-
-  function formatRecordingTime(
-    seconds: number,
-  ) {
-    const minutes =
-      Math.floor(
-        seconds / 60,
-      );
-
-    const remainingSeconds =
-      seconds % 60;
-
-    return `${minutes
-      .toString()
-      .padStart(2, '0')}:${remainingSeconds
-      .toString()
-      .padStart(2, '0')}`;
-  }
+    setRecording(false);
+    setRecordingSeconds(0);
+    stopCamera();
+    onClose?.();
+  }, [onClose, stopCamera]);
 
   async function toggleFlash() {
-    const track =
-      streamRef.current?.getVideoTracks()[0];
+    const track = streamRef.current?.getVideoTracks()[0];
+    if (!track || !flashSupported) return;
 
-    if (
-      !track ||
-      !flashSupported
-    ) {
-      return;
-    }
-
-    const nextValue =
-      !flashEnabled;
+    const nextValue = !flashEnabled;
 
     try {
       await track.applyConstraints({
         advanced: [
           {
             torch: nextValue,
-          } as MediaTrackConstraintSet,
+          } as ExtendedMediaTrackConstraintSet,
         ],
       });
-
-      setFlashEnabled(
-        nextValue,
-      );
+      setFlashEnabled(nextValue);
     } catch (error) {
-      console.error(
-        'Flash control error:',
-        error,
-      );
-
-      setUploadError(
-        'Flash control is not available on this camera.',
-      );
+      console.error('Flash control error:', error);
+      setMessage('Flash is not available on this camera.');
     }
   }
 
-  async function changeZoom(
-    value: number,
-  ) {
-    const track =
-      streamRef.current?.getVideoTracks()[0];
+  async function changeZoom(value: number) {
+    const track = streamRef.current?.getVideoTracks()[0];
+    if (!track || !zoomSupported) return;
 
-    if (
-      !track ||
-      !zoomSupported
-    ) {
-      return;
-    }
+    const nextValue = Math.min(zoomMax, Math.max(zoomMin, value));
 
     try {
       await track.applyConstraints({
         advanced: [
           {
-            zoom: value,
-          } as MediaTrackConstraintSet,
+            zoom: nextValue,
+          } as ExtendedMediaTrackConstraintSet,
         ],
       });
-
-      setZoom(value);
+      setZoom(nextValue);
     } catch (error) {
-      console.error(
-        'Camera zoom error:',
-        error,
-      );
+      console.error('Camera zoom error:', error);
     }
   }
 
-  function resetZoom() {
-    if (!zoomSupported) {
+  async function switchCamera() {
+    if (recording || !cameraReady) return;
+
+    const cameras = await enumerateCameras();
+
+    if (cameras.length > 1) {
+      const currentDeviceId =
+        streamRef.current?.getVideoTracks()[0]?.getSettings().deviceId;
+      const currentIndex = Math.max(
+        0,
+        cameras.findIndex((device) => device.deviceId === currentDeviceId),
+      );
+      const nextDevice = cameras[(currentIndex + 1) % cameras.length];
+
+      activeDeviceIdRef.current = nextDevice?.deviceId ?? null;
+      setHasActiveDevice(Boolean(activeDeviceIdRef.current));
+      if (!activeDeviceIdRef.current) {
+        setFacingMode((current) =>
+          current === 'environment' ? 'user' : 'environment',
+        );
+      } else {
+        void startCamera();
+      }
       return;
     }
 
-    void changeZoom(
-      zoomMin,
+    activeDeviceIdRef.current = null;
+    setHasActiveDevice(false);
+    setFacingMode((current) =>
+      current === 'environment' ? 'user' : 'environment',
     );
   }
 
-  async function capturePhoto() {
-    if (
-      !videoRef.current ||
-      !cameraReady ||
-      recording
-    ) {
+  function capturePhoto() {
+    if (!videoRef.current || !cameraReady || recording || captureBusy) {
       return;
     }
 
+    setCaptureBusy(true);
+    setMessage('');
+
     try {
-      setUploadError('');
-      setUploadMessage('');
+      const video = videoRef.current;
 
-      const video =
-        videoRef.current;
-
-      const canvas =
-        document.createElement(
-          'canvas',
-        );
-
-      canvas.width =
-        video.videoWidth;
-
-      canvas.height =
-        video.videoHeight;
-
-      const context =
-        canvas.getContext('2d');
-
-      if (!context) {
-        throw new Error(
-          'Unable to capture photograph.',
-        );
+      if (!video.videoWidth || !video.videoHeight) {
+        throw new Error('Camera is not ready yet.');
       }
 
-      if (
-        facingMode === 'user'
-      ) {
-        context.translate(
-          canvas.width,
-          0,
-        );
+      const canvas = document.createElement('canvas');
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
 
+      const context = canvas.getContext('2d');
+      if (!context) {
+        throw new Error('Unable to capture photograph.');
+      }
+
+      if (facingMode === 'user' && !activeDeviceIdRef.current) {
+        context.translate(canvas.width, 0);
         context.scale(-1, 1);
       }
 
-      context.drawImage(
-        video,
-        0,
-        0,
-        canvas.width,
-        canvas.height,
-      );
+      context.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-      const blob =
-        await new Promise<Blob | null>(
-          (resolve) =>
-            canvas.toBlob(
-              resolve,
-              'image/jpeg',
-              0.92,
-            ),
-        );
+      canvas.toBlob(
+        (blob) => {
+          if (!blob) {
+            setMessage('Unable to create the photograph.');
+            setCaptureBusy(false);
+            return;
+          }
 
-      if (!blob) {
-        throw new Error(
-          'Unable to create photograph.',
-        );
-      }
+          const file = new File(
+            [blob],
+            `oasis26-${Date.now()}.jpg`,
+            { type: 'image/jpeg' },
+          );
 
-      queueUpload(
-        blob,
-        `oasis26-${Date.now()}.jpg`,
+          const started = startUpload('live', [
+            {
+              id: createCaptureId('photo'),
+              file,
+            },
+          ]);
+
+          setMessage(
+            started
+              ? 'Photo added to the upload queue.'
+              : 'Unable to add the photo to the upload queue.',
+          );
+          setCaptureBusy(false);
+        },
+        'image/jpeg',
+        0.9,
       );
     } catch (error) {
-      console.error(
-        'Photo capture error:',
-        error,
-      );
-
-      setUploadError(
+      console.error('Photo capture error:', error);
+      setMessage(
         error instanceof Error
           ? error.message
           : 'Unable to capture photograph.',
       );
+      setCaptureBusy(false);
     }
   }
 
+  function getSupportedVideoMimeType() {
+    const types = [
+      'video/mp4;codecs=h264,aac',
+      'video/mp4',
+      'video/webm;codecs=vp9,opus',
+      'video/webm;codecs=vp8,opus',
+      'video/webm',
+    ];
+
+    return types.find((type) =>
+      MediaRecorder.isTypeSupported(type),
+    ) ?? '';
+  }
+
   function startRecording() {
-    if (
-      !streamRef.current ||
-      !cameraReady ||
-      recording
-    ) {
+    if (!streamRef.current || !cameraReady || recording) return;
+
+    if (typeof MediaRecorder === 'undefined') {
+      setMessage('Video recording is not supported by this browser.');
       return;
     }
 
-    const mimeType =
-      getSupportedVideoMimeType();
-
+    const mimeType = getSupportedVideoMimeType();
     if (!mimeType) {
-      setUploadError(
-        'Video recording is not supported by this browser.',
-      );
-
+      setMessage('Video recording is not supported by this browser.');
       return;
     }
 
-    recordedChunksRef.current =
-      [];
+    const recorder = new MediaRecorder(streamRef.current, {
+      mimeType,
+      videoBitsPerSecond: 1_800_000,
+      audioBitsPerSecond: 128_000,
+    });
 
-    const recorder =
-      new MediaRecorder(
-        streamRef.current,
-        {
-          mimeType,
+    recordedChunksRef.current = [];
+    mediaRecorderRef.current = recorder;
 
-          /*
-           * 1.8 Mbps gives good 720p
-           * wedding-video quality while
-           * keeping uploads substantially
-           * lighter than 2.5 Mbps.
-           */
-          videoBitsPerSecond:
-            1_800_000,
-        },
-      );
+    recorder.ondataavailable = (event) => {
+      if (event.data.size > 0) {
+        recordedChunksRef.current.push(event.data);
+      }
+    };
 
-    mediaRecorderRef.current =
-      recorder;
-
-    recorder.ondataavailable = (
-      event,
-    ) => {
-      if (
-        event.data.size > 0
-      ) {
-        recordedChunksRef.current.push(
-          event.data,
-        );
+    recorder.onerror = () => {
+      setRecording(false);
+      setRecordingSeconds(0);
+      setMessage('Video recording failed.');
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
       }
     };
 
     recorder.onstop = () => {
-      const chunks =
-        recordedChunksRef.current;
+      const chunks = recordedChunksRef.current;
 
       if (!chunks.length) {
         setRecording(false);
@@ -976,147 +543,64 @@ export default function GalleryCamera({
         return;
       }
 
-      const blob =
-        new Blob(
-          chunks,
-          {
-            type: mimeType,
-          },
-        );
-
-      const extension =
-        getVideoExtension(
-          mimeType,
-        );
-
-      setRecording(false);
-      setRecordingSeconds(0);
-
-      /*
-       * Do NOT await this.
-       *
-       * The video immediately enters the
-       * background upload queue while the
-       * camera remains available.
-       */
-      queueUpload(
-        blob,
+      const blob = new Blob(chunks, { type: mimeType });
+      const extension = mimeType.includes('mp4') ? 'mp4' : 'webm';
+      const file = new File(
+        [blob],
         `oasis26-video-${Date.now()}.${extension}`,
+        { type: mimeType },
       );
 
-      recordedChunksRef.current =
-        [];
-    };
+      const started = startUpload('live', [
+        {
+          id: createCaptureId('video'),
+          file,
+        },
+      ]);
 
-    recorder.onerror = () => {
+      setMessage(
+        started
+          ? 'Video added to the upload queue.'
+          : 'Unable to add the video to the upload queue.',
+      );
+
+      recordedChunksRef.current = [];
+      mediaRecorderRef.current = null;
       setRecording(false);
       setRecordingSeconds(0);
 
-      setUploadError(
-        'Video recording failed.',
-      );
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
     };
 
     recorder.start(1000);
-
     setRecording(true);
     setRecordingSeconds(0);
-    setUploadError('');
-    setUploadMessage('');
+    setMessage('');
+
+    timerRef.current = setInterval(() => {
+      setRecordingSeconds((seconds) => seconds + 1);
+    }, 1000);
   }
 
   function stopRecording() {
-    const recorder =
-      mediaRecorderRef.current;
-
-    if (
-      !recorder ||
-      recorder.state === 'inactive'
-    ) {
-      return;
-    }
-
+    const recorder = mediaRecorderRef.current;
+    if (!recorder || recorder.state === 'inactive') return;
     recorder.stop();
   }
 
-  function switchCamera() {
-    if (recording) {
-      return;
-    }
-
-    setFacingMode(
-      (current) =>
-        current === 'environment'
-          ? 'user'
-          : 'environment',
-    );
+  function formatTime(seconds: number) {
+    const minutes = Math.floor(seconds / 60);
+    const remaining = seconds % 60;
+    return `${String(minutes).padStart(2, '0')}:${String(remaining).padStart(2, '0')}`;
   }
 
-  function closeCamera() {
-    /*
-     * Uploads are intentionally NOT cancelled.
-     *
-     * Once a file has entered the queue,
-     * it continues uploading in the background.
-     */
-    const recorder =
-      mediaRecorderRef.current;
-
-    if (
-      recorder &&
-      recorder.state !== 'inactive'
-    ) {
-      recorder.onstop = null;
-      recorder.onerror = null;
-      recorder.stop();
-    }
-
-    mediaRecorderRef.current =
-      null;
-
-    recordedChunksRef.current =
-      [];
-
-    stopCamera();
-
-    onClose?.();
-  }
-
-  const queuedCount =
-    uploadQueue.filter(
-      (item) =>
-        item.status === 'queued',
-    ).length;
-
-  const activeCount =
-    uploadQueue.filter(
-      (item) =>
-        item.status === 'uploading',
-    ).length;
-
-  const failedCount =
-    uploadQueue.filter(
-      (item) =>
-        item.status === 'failed',
-    ).length;
-
-  const completedCount =
-    uploadQueue.filter(
-      (item) =>
-        item.status === 'uploaded',
-    ).length;
-
-  const hasQueue =
-    uploadQueue.length > 0;
-
-  const queueProgressItems =
-    uploadQueue.filter(
-      (item) =>
-        item.status ===
-          'uploading' ||
-        item.status === 'queued' ||
-        item.status === 'failed',
-    );
+  const modeLabel = useMemo(
+    () => (mode === 'photo' ? 'Photo' : 'Video'),
+    [mode],
+  );
 
   if (!mounted) {
     return null;
@@ -1124,523 +608,205 @@ export default function GalleryCamera({
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[2147483647] flex items-center justify-center bg-ink/80 p-2 backdrop-blur-md sm:p-4"
+      className="fixed inset-0 z-[2147483647] flex min-h-[100dvh] items-center justify-center bg-ink/90 px-2.5 py-3 backdrop-blur-md sm:px-5 sm:py-6"
       role="dialog"
       aria-modal="true"
-      aria-label="OASIS'26 Live Gallery Camera"
+      aria-label="Live gallery camera"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget && !recording) {
+          closeCamera();
+        }
+      }}
     >
-      <div className="relative flex h-full max-h-[900px] w-full max-w-2xl flex-col overflow-hidden rounded-[24px] border border-sand-dark/60 bg-cream shadow-2xl sm:max-h-[92vh] sm:rounded-[28px]">
-        {/* ===================================================== */}
-        {/* HEADER */}
-        {/* ===================================================== */}
-
-        <div className="absolute left-0 right-0 top-0 z-30 flex items-center justify-between bg-gradient-to-b from-ink/80 to-transparent px-4 pb-8 pt-4 sm:px-5 sm:pt-5">
-          <div>
-            <p className="text-[9px] font-bold uppercase tracking-[0.28em] text-gold">
-              OASIS&apos;26
-            </p>
-
-            <p className="mt-1 font-[family-name:var(--font-cormorant)] text-xl font-semibold text-white sm:text-2xl">
-              Live Moments
-            </p>
-          </div>
-
-          <div className="flex items-center gap-2">
-            {hasQueue && (
-              <CameraTooltip
-                label="Upload queue"
-              >
-                <div className="relative flex h-9 min-w-9 items-center justify-center rounded-full border border-white/20 bg-ink/45 px-2 text-white backdrop-blur">
-                  <UploadCloud className="h-4 w-4" />
-
-                  {(queuedCount +
-                    activeCount) >
-                    0 && (
-                    <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-gold px-1 text-[8px] font-bold text-ink">
-                      {queuedCount +
-                        activeCount}
-                    </span>
-                  )}
-                </div>
-              </CameraTooltip>
-            )}
-
-            <CameraTooltip label="Close camera">
-              <button
-                type="button"
-                onClick={closeCamera}
-                className="flex h-9 w-9 items-center justify-center rounded-full border border-white/20 bg-ink/45 text-white backdrop-blur transition hover:bg-wine"
-                aria-label="Close camera"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </CameraTooltip>
-          </div>
-        </div>
-
-        {/* ===================================================== */}
-        {/* CAMERA VIEW */}
-        {/* ===================================================== */}
-
-        <div className="relative min-h-0 flex-1 overflow-hidden bg-ink">
+      <div className="relative w-full max-w-3xl overflow-hidden rounded-[24px] border border-white/10 bg-ink shadow-2xl sm:rounded-[30px]">
+        <div className="relative aspect-[4/5] overflow-hidden bg-black sm:aspect-video">
           <video
             ref={videoRef}
+            autoPlay
             muted
             playsInline
-            autoPlay
             className={`h-full w-full object-cover ${
-              facingMode === 'user'
+              facingMode === 'user' && !hasActiveDevice
                 ? '-scale-x-100'
                 : ''
             }`}
+            aria-label="Camera preview"
           />
 
-          <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-ink/25 via-transparent to-ink/45" />
+          <div className="pointer-events-none absolute inset-x-0 top-0 h-32 bg-gradient-to-b from-black/65 to-transparent" />
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 h-40 bg-gradient-to-t from-black/75 to-transparent" />
 
-          <div className="pointer-events-none absolute inset-x-0 bottom-0 h-40 bg-gradient-to-t from-ink/75 to-transparent" />
-
-          {/* Camera loading */}
-          {!cameraReady &&
-            !cameraError && (
-              <div className="absolute inset-0 flex flex-col items-center justify-center bg-ink text-white">
-                <div className="flex h-12 w-12 items-center justify-center rounded-full border border-gold/40 bg-wine/30">
-                  <Loader2 className="h-5 w-5 animate-spin text-gold" />
-                </div>
-
-                <p className="mt-3 text-xs font-semibold tracking-wide text-white/80">
-                  Preparing your camera...
-                </p>
-              </div>
-            )}
-
-          {/* Camera error */}
-          {cameraError && (
-            <div className="absolute inset-0 flex flex-col items-center justify-center bg-ink px-6 text-center text-white">
-              <div className="flex h-12 w-12 items-center justify-center rounded-full border border-gold/40 bg-wine/30">
-                <Camera className="h-5 w-5 text-gold" />
-              </div>
-
-              <p className="mt-4 max-w-sm text-xs leading-5 text-white/75">
-                {cameraError}
-              </p>
-
-              <button
-                type="button"
-                onClick={startCamera}
-                className="mt-4 rounded-full bg-gold px-5 py-2.5 text-[9px] font-bold uppercase tracking-[0.14em] text-ink transition hover:bg-gold/90"
-              >
-                Try Again
-              </button>
+          <div className="absolute left-3 right-3 top-3 z-20 flex items-center justify-between sm:left-4 sm:right-4 sm:top-4">
+            <div className="rounded-full bg-black/45 px-3 py-1.5 text-[8px] font-bold uppercase tracking-[0.16em] text-white backdrop-blur-md sm:text-[9px]">
+              {recording ? `Recording ${formatTime(recordingSeconds)}` : modeLabel}
             </div>
-          )}
-
-          {/* Camera utilities */}
-          {cameraReady &&
-            !cameraError && (
-              <div className="absolute left-1/2 top-16 z-20 flex -translate-x-1/2 items-center gap-2 rounded-full border border-white/10 bg-ink/50 p-1 backdrop-blur-md">
-                <CameraTooltip
-                  label={
-                    flashEnabled
-                      ? 'Turn flash off'
-                      : 'Turn flash on'
-                  }
-                >
-                  <button
-                    type="button"
-                    onClick={
-                      toggleFlash
-                    }
-                    disabled={
-                      !flashSupported ||
-                      recording
-                    }
-                    className={`flex h-8 w-8 items-center justify-center rounded-full transition ${
-                      flashEnabled
-                        ? 'bg-gold text-ink'
-                        : 'text-white hover:bg-white/15'
-                    } disabled:cursor-not-allowed disabled:opacity-30`}
-                    aria-label={
-                      flashEnabled
-                        ? 'Turn flash off'
-                        : 'Turn flash on'
-                    }
-                  >
-                    <Zap className="h-3.5 w-3.5" />
-                  </button>
-                </CameraTooltip>
-
-                {zoomSupported && (
-                  <>
-                    <div className="h-4 w-px bg-white/15" />
-
-                    <CameraTooltip
-                      label={`Zoom ${zoom.toFixed(
-                        1,
-                      )}x`}
-                    >
-                      <div className="flex items-center gap-1.5 px-1">
-                        <ZoomIn className="h-3.5 w-3.5 text-white/75" />
-
-                        <input
-                          type="range"
-                          min={zoomMin}
-                          max={zoomMax}
-                          step={zoomStep}
-                          value={zoom}
-                          onChange={(
-                            event,
-                          ) => {
-                            void changeZoom(
-                              Number(
-                                event
-                                  .target
-                                  .value,
-                              ),
-                            );
-                          }}
-                          className="h-1 w-20 cursor-pointer accent-gold"
-                          aria-label="Camera zoom"
-                        />
-                      </div>
-                    </CameraTooltip>
-
-                    <CameraTooltip label="Reset zoom">
-                      <button
-                        type="button"
-                        onClick={
-                          resetZoom
-                        }
-                        disabled={
-                          recording ||
-                          zoom <=
-                            zoomMin
-                        }
-                        className="flex h-8 w-8 items-center justify-center rounded-full text-white transition hover:bg-white/15 disabled:cursor-not-allowed disabled:opacity-30"
-                        aria-label="Reset zoom"
-                      >
-                        <RotateCcw className="h-3.5 w-3.5" />
-                      </button>
-                    </CameraTooltip>
-                  </>
-                )}
-              </div>
-            )}
-
-          {/* Recording indicator */}
-          {recording && (
-            <div className="absolute left-1/2 top-16 flex -translate-x-1/2 items-center gap-2 rounded-full border border-white/10 bg-ink/70 px-3.5 py-2 backdrop-blur-md">
-              <span className="h-2 w-2 animate-pulse rounded-full bg-wine" />
-
-              <span className="text-[10px] font-bold tracking-[0.16em] text-white">
-                {formatRecordingTime(
-                  recordingSeconds,
-                )}
-              </span>
-            </div>
-          )}
-
-          {/* Background upload queue */}
-          {hasQueue && (
-            <div className="absolute bottom-4 left-3 right-3 z-20 mx-auto max-w-sm rounded-2xl border border-white/10 bg-ink/75 p-3 backdrop-blur-md">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2 text-[10px] font-semibold text-white">
-                  {activeCount >
-                  0 ? (
-                    <Loader2 className="h-3.5 w-3.5 animate-spin text-gold" />
-                  ) : (
-                    <UploadCloud className="h-3.5 w-3.5 text-gold" />
-                  )}
-
-                  <span>
-                    {activeCount >
-                    0
-                      ? `Uploading ${activeCount} moment${
-                          activeCount ===
-                          1
-                            ? ''
-                            : 's'
-                        }...`
-                      : queuedCount >
-                        0
-                        ? `${queuedCount} moment${
-                            queuedCount ===
-                            1
-                              ? ''
-                              : 's'
-                          } queued`
-                        : failedCount >
-                          0
-                          ? `${failedCount} upload${
-                              failedCount ===
-                              1
-                                ? ''
-                                : 's'
-                            } failed`
-                          : `${completedCount} uploaded`}
-                  </span>
-                </div>
-
-                {completedCount >
-                  0 && (
-                  <button
-                    type="button"
-                    onClick={
-                      clearCompletedUploads
-                    }
-                    className="text-[8px] font-bold uppercase tracking-[0.1em] text-gold transition hover:text-white"
-                  >
-                    Clear
-                  </button>
-                )}
-              </div>
-
-              {queueProgressItems
-                .slice(0, 3)
-                .map(
-                  (item) => (
-                    <div
-                      key={
-                        item.id
-                      }
-                      className="mt-2"
-                    >
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="min-w-0 flex-1 truncate text-[8px] text-white/65">
-                          {item.file
-                            .name}
-                        </span>
-
-                        {item.status ===
-                          'uploading' && (
-                          <span className="text-[8px] font-bold text-gold">
-                            {
-                              item.progress
-                            }%
-                          </span>
-                        )}
-
-                        {item.status ===
-                          'queued' && (
-                          <span className="text-[8px] font-bold text-white/55">
-                            Queued
-                          </span>
-                        )}
-
-                        {item.status ===
-                          'failed' && (
-                          <button
-                            type="button"
-                            onClick={() =>
-                              retryUpload(
-                                item.id,
-                              )
-                            }
-                            className="text-[8px] font-bold uppercase tracking-[0.08em] text-gold"
-                          >
-                            Retry
-                          </button>
-                        )}
-                      </div>
-
-                      {item.status ===
-                        'uploading' && (
-                        <div className="mt-1 h-0.5 overflow-hidden rounded-full bg-white/15">
-                          <div
-                            className="h-full rounded-full bg-gold transition-all duration-200"
-                            style={{
-                              width: `${item.progress}%`,
-                            }}
-                          />
-                        </div>
-                      )}
-                    </div>
-                  ),
-                )}
-            </div>
-          )}
-
-          {/* Success */}
-          {uploadMessage &&
-            activeCount === 0 &&
-            queuedCount === 0 && (
-              <div className="absolute bottom-5 left-1/2 z-20 flex -translate-x-1/2 items-center gap-2 rounded-full border border-white/10 bg-emerald px-4 py-2.5 text-[10px] font-semibold text-white shadow-lg">
-                <Check className="h-3.5 w-3.5" />
-                {uploadMessage}
-              </div>
-            )}
-
-          {/* Error */}
-          {uploadError &&
-            failedCount > 0 && (
-              <div className="absolute bottom-5 left-4 right-4 z-20 mx-auto max-w-sm rounded-2xl bg-wine px-4 py-3 text-center text-[10px] font-medium leading-4 text-white shadow-lg">
-                {uploadError}
-              </div>
-            )}
-        </div>
-
-        {/* ===================================================== */}
-        {/* CONTROLS */}
-        {/* ===================================================== */}
-
-        <div className="shrink-0 border-t border-sand-dark/60 bg-cream px-4 pb-4 pt-3 sm:px-5 sm:pb-5 sm:pt-4">
-          {/* Mode switch */}
-          <div className="mx-auto flex w-fit items-center rounded-full border border-sand-dark/70 bg-white p-1 shadow-sm">
-            <button
-              type="button"
-              onClick={() =>
-                setMode('photo')
-              }
-              disabled={recording}
-              className={`flex items-center gap-1.5 rounded-full px-4 py-2 text-[9px] font-bold uppercase tracking-[0.12em] transition ${
-                mode === 'photo'
-                  ? 'bg-wine text-white shadow-sm'
-                  : 'text-ink-soft hover:bg-cream'
-              } disabled:cursor-not-allowed disabled:opacity-40`}
-            >
-              <ImagePlus className="h-3.5 w-3.5" />
-              Photo
-            </button>
 
             <button
+              ref={closeButtonRef}
               type="button"
-              onClick={() =>
-                setMode('video')
-              }
+              onClick={closeCamera}
               disabled={recording}
-              className={`flex items-center gap-1.5 rounded-full px-4 py-2 text-[9px] font-bold uppercase tracking-[0.12em] transition ${
-                mode === 'video'
-                  ? 'bg-wine text-white shadow-sm'
-                  : 'text-ink-soft hover:bg-cream'
-              } disabled:cursor-not-allowed disabled:opacity-40`}
+              className="flex h-9 w-9 items-center justify-center rounded-full border border-white/15 bg-black/45 text-white backdrop-blur-md transition hover:bg-wine disabled:cursor-not-allowed disabled:opacity-50"
+              aria-label="Close camera"
             >
-              <Video className="h-3.5 w-3.5" />
-              Video
+              <X className="h-4 w-4" />
             </button>
           </div>
 
-          {/* Main camera controls */}
-          <div className="mt-3 flex items-center justify-center gap-7">
-            {/* Switch camera */}
-            <CameraTooltip label="Switch camera">
+          {cameraError ? (
+            <div className="absolute inset-0 z-30 flex flex-col items-center justify-center bg-ink/80 px-7 text-center text-white">
+              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-wine/20 text-wine">
+                <Camera className="h-5 w-5" />
+              </div>
+              <p className="mt-4 text-sm font-semibold">Camera unavailable</p>
+              <p className="mt-1 max-w-sm text-[10px] leading-4 text-white/60">
+                {cameraError}
+              </p>
               <button
                 type="button"
-                onClick={
-                  switchCamera
-                }
-                disabled={
-                  recording ||
-                  !cameraReady
-                }
-                className="flex h-10 w-10 items-center justify-center rounded-full border border-sand-dark/70 bg-white text-wine shadow-sm transition hover:border-wine hover:bg-wine hover:text-white disabled:cursor-not-allowed disabled:opacity-35"
+                onClick={() => void startCamera()}
+                className="mt-4 inline-flex items-center gap-1.5 rounded-full bg-wine px-4 py-2 text-[8px] font-bold uppercase tracking-[0.12em] text-white transition hover:bg-wine/90"
+              >
+                <Loader2 className="h-3 w-3" />
+                Retry camera
+              </button>
+            </div>
+          ) : starting || !cameraReady ? (
+            <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-ink/45 text-white backdrop-blur-[2px]">
+              <div className="flex h-14 w-14 items-center justify-center rounded-full border border-white/10 bg-black/35">
+                <Loader2 className="h-6 w-6 animate-spin" />
+              </div>
+              <p className="mt-3 text-[9px] font-semibold uppercase tracking-[0.12em] text-white/75">
+                Starting camera
+              </p>
+            </div>
+          ) : null}
+
+          <div className="absolute left-3 right-3 top-16 z-20 flex items-center justify-center gap-1.5 sm:left-4 sm:right-4 sm:top-20">
+            {flashSupported && (
+              <button
+                type="button"
+                onClick={() => void toggleFlash()}
+                disabled={recording}
+                className={`flex h-8 w-8 items-center justify-center rounded-full border text-white backdrop-blur-md transition sm:h-9 sm:w-9 ${
+                  flashEnabled
+                    ? 'border-gold/60 bg-gold/80 text-ink'
+                    : 'border-white/15 bg-black/45 hover:bg-white/15'
+                } disabled:opacity-50`}
+                aria-label={flashEnabled ? 'Turn flash off' : 'Turn flash on'}
+                title={flashEnabled ? 'Flash on' : 'Flash off'}
+              >
+                <Zap className="h-3.5 w-3.5" />
+              </button>
+            )}
+
+            {zoomSupported && !recording && (
+              <div className="flex h-8 items-center gap-1 rounded-full border border-white/15 bg-black/45 px-2 backdrop-blur-md sm:h-9">
+                <ZoomIn className="h-3 w-3 text-white/80" />
+                <input
+                  type="range"
+                  min={zoomMin}
+                  max={zoomMax}
+                  step={zoomStep}
+                  value={zoom}
+                  onChange={(event) => void changeZoom(Number(event.target.value))}
+                  className="w-24 accent-white sm:w-28"
+                  aria-label="Camera zoom"
+                />
+              </div>
+            )}
+          </div>
+
+          <div className="absolute bottom-4 left-3 right-3 z-20 sm:bottom-5 sm:left-4 sm:right-4">
+            {message && (
+              <div className="mx-auto mb-3 flex max-w-xs items-center justify-center gap-1.5 rounded-full border border-white/10 bg-black/45 px-3 py-1.5 text-center text-[8px] text-white/80 backdrop-blur-md">
+                <Check className="h-3 w-3 text-emerald" />
+                {message}
+              </div>
+            )}
+
+            <div className="flex items-center justify-center gap-3">
+              <button
+                type="button"
+                onClick={() => void switchCamera()}
+                disabled={recording || cameraCount < 1 || !cameraReady}
+                className="flex h-10 w-10 items-center justify-center rounded-full border border-white/15 bg-black/45 text-white backdrop-blur-md transition hover:bg-white/15 disabled:cursor-not-allowed disabled:opacity-40 sm:h-11 sm:w-11"
                 aria-label="Switch camera"
               >
                 <FlipHorizontal2 className="h-4 w-4" />
               </button>
-            </CameraTooltip>
 
-            {/* Capture / record */}
-            {mode === 'photo' ? (
-              <CameraTooltip label="Take photo">
-                <button
-                  type="button"
-                  onClick={
-                    capturePhoto
-                  }
-                  disabled={
-                    !cameraReady ||
-                    recording
-                  }
-                  className="relative flex h-[68px] w-[68px] items-center justify-center rounded-full border-[3px] border-wine bg-white shadow-lg transition hover:scale-[1.03] active:scale-95 disabled:cursor-not-allowed disabled:opacity-35"
-                  aria-label="Take photo"
-                >
-                  <span className="h-[52px] w-[52px] rounded-full border border-gold/40 bg-cream" />
-
-                  <span className="absolute h-10 w-10 rounded-full bg-wine" />
-                </button>
-              </CameraTooltip>
-            ) : recording ? (
-              <CameraTooltip label="Stop recording and upload">
-                <button
-                  type="button"
-                  onClick={
-                    stopRecording
-                  }
-                  className="flex h-[68px] w-[68px] items-center justify-center rounded-full border-[3px] border-wine bg-wine shadow-lg transition hover:scale-[1.03] active:scale-95"
-                  aria-label="Stop recording"
-                >
-                  <Square className="h-6 w-6 fill-white text-white" />
-                </button>
-              </CameraTooltip>
-            ) : (
-              <CameraTooltip label="Start video recording">
-                <button
-                  type="button"
-                  onClick={
-                    startRecording
-                  }
-                  disabled={
-                    !cameraReady
-                  }
-                  className="relative flex h-[68px] w-[68px] items-center justify-center rounded-full border-[3px] border-wine bg-white shadow-lg transition hover:scale-[1.03] active:scale-95 disabled:cursor-not-allowed disabled:opacity-35"
-                  aria-label="Start recording"
-                >
-                  <span className="h-10 w-10 rounded-full bg-wine" />
-                </button>
-              </CameraTooltip>
-            )}
-
-            {/* Current mode indicator */}
-            <CameraTooltip
-              label={
-                mode === 'video'
-                  ? 'Video with sound'
-                  : 'Photo mode'
-              }
-            >
-              <div className="flex h-10 w-10 items-center justify-center rounded-full border border-sand-dark/70 bg-white text-ink-soft shadow-sm">
-                {mode ===
-                'video' ? (
-                  <Mic className="h-4 w-4 text-wine" />
+              <button
+                type="button"
+                onClick={mode === 'photo' ? capturePhoto : recording ? stopRecording : startRecording}
+                disabled={!cameraReady || starting || captureBusy}
+                className={`flex h-16 w-16 items-center justify-center rounded-full border-4 border-white/90 shadow-[0_8px_30px_rgba(0,0,0,0.24)] transition sm:h-20 sm:w-20 ${
+                  recording
+                    ? 'bg-wine'
+                    : 'bg-white'
+                } disabled:opacity-50`}
+                aria-label={
+                  mode === 'photo'
+                    ? 'Take photo'
+                    : recording
+                      ? 'Stop recording'
+                      : 'Start recording'
+                }
+              >
+                {mode === 'photo' ? (
+                  <Camera className="h-6 w-6 text-ink sm:h-7 sm:w-7" />
+                ) : recording ? (
+                  <Square className="h-6 w-6 fill-white text-white sm:h-7 sm:w-7" />
                 ) : (
-                  <Camera className="h-4 w-4 text-emerald" />
+                  <Video className="h-6 w-6 text-wine sm:h-7 sm:w-7" />
+                )}
+              </button>
+
+              <div className="flex h-10 w-10 items-center justify-center sm:h-11 sm:w-11">
+                {mode === 'video' && (
+                  <Mic className="h-4 w-4 text-white/80" aria-hidden="true" />
                 )}
               </div>
-            </CameraTooltip>
-          </div>
+            </div>
 
-          <p className="mt-2 text-center text-[9px] font-semibold uppercase tracking-[0.14em] text-ink-soft/70">
+            <div className="mt-3 flex items-center justify-center rounded-full border border-white/10 bg-black/35 p-1 backdrop-blur-md">
+              {(['photo', 'video'] as const).map((option) => (
+                <button
+                  key={option}
+                  type="button"
+                  onClick={() => setMode(option)}
+                  disabled={recording || starting}
+                  className={`flex min-w-20 items-center justify-center gap-1.5 rounded-full px-3 py-1.5 text-[8px] font-bold uppercase tracking-[0.1em] transition ${
+                    mode === option
+                      ? 'bg-white text-ink'
+                      : 'text-white/65 hover:text-white'
+                  } disabled:opacity-50 sm:min-w-24 sm:text-[9px]`}
+                >
+                  {option === 'photo' ? (
+                    <Camera className="h-3 w-3" />
+                  ) : (
+                    <Video className="h-3 w-3" />
+                  )}
+                  {option}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        <div className="flex items-center justify-between gap-3 bg-cream px-3 py-2.5 sm:px-4 sm:py-3">
+          <p className="text-[8px] leading-3.5 text-ink-soft sm:text-[9px]">
             {mode === 'photo'
-              ? 'Tap to capture — uploads in the background'
-              : recording
-                ? 'Tap stop — your video uploads automatically'
-                : 'Tap to begin recording'}
+              ? 'Photos are uploaded privately through the secure gallery upload pipeline.'
+              : 'Videos include microphone audio and upload in the background when recording stops.'}
           </p>
+
+          <span className="shrink-0 rounded-full bg-white px-2 py-1 text-[7px] font-bold uppercase tracking-[0.08em] text-emerald shadow-sm">
+            Live Gallery
+          </span>
         </div>
       </div>
     </div>,
     document.body,
-  );
-}
-
-type CameraTooltipProps = {
-  label: string;
-  children: React.ReactNode;
-};
-
-function CameraTooltip({
-  label,
-  children,
-}: CameraTooltipProps) {
-  return (
-    <div className="group relative">
-      {children}
-
-      <span
-        role="tooltip"
-        className="pointer-events-none absolute bottom-full left-1/2 z-[2147483647] mb-2 -translate-x-1/2 whitespace-nowrap rounded-lg bg-ink px-2.5 py-1.5 text-[9px] font-semibold text-white opacity-0 shadow-lg transition duration-150 group-hover:opacity-100 group-focus-within:opacity-100"
-      >
-        {label}
-      </span>
-    </div>
   );
 }

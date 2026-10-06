@@ -11,24 +11,26 @@ const events = [
     event: 'Traditional Marriage Rite',
     date: 'October 8, 2026',
     dateShort: '08 OCT',
-    time: '11:00 AM Prompt',
-    target: '2026-10-08T11:00:00+01:00',
+    time: '4:00 PM',
+    target: '2026-10-08T16:00:00+01:00',
     venue:
       'Bassa-Nge Anglican Grammar School, Gboloko, Kogi State.',
+    mapLink: 'https://maps.app.goo.gl/kBjpGxh362ZEtRgV9?g_st=ic',
     message:
       'Where heritage meets love, and two families begin to become one.',
     accent: 'wine',
   },
   {
-    event: 'Wedding Eve',
+    event: 'Wedding Eve — Tehilah Experience',
     date: 'October 9, 2026',
     dateShort: '09 OCT',
     time: '4:00 PM',
     target: '2026-10-09T16:00:00+01:00',
     venue:
-      'Bassa-Nge Anglican Grammar School, Gboloko, Kogi State.',
+      'Phase II, Opp. Rehoboth Hospital, Lokoja, Kogi State.',
+    mapLink: 'https://maps.app.goo.gl/LPFEmFRsH5nZhfBw6?g_st=ic',
     message:
-      'The evening before forever — laughter, stories, anticipation, and love.',
+      'A worship concert of praise, worship, and heartfelt celebration before the wedding day.',
     accent: 'mint',
   },
   {
@@ -39,6 +41,7 @@ const events = [
     target: '2026-10-10T10:00:00+01:00',
     venue:
       'Crowther Memorial Anglican Church, Lokoja.',
+    mapLink: 'https://maps.app.goo.gl/Sf8vPN6hrgJo59uD6?g_st=ic',
     message:
       'Before God and the people we love, two hearts become one.',
     accent: 'emerald',
@@ -51,14 +54,12 @@ const events = [
     target: '2026-10-10T12:30:00+01:00',
     venue:
       'Kay Galaxy Event Center, along IBB Way, Zone 8, Opp. Civil Defence HQ, Old Okene/Kabba Road, Lokoja, Kogi State.',
+    mapLink: 'https://maps.app.goo.gl/DRT9YsMG24dsQMVd9?g_st=ic',
     message:
       'Come celebrate the beginning of a beautiful new chapter with us.',
     accent: 'wine',
   },
 ];
-
-const mapLink =
-  'https://maps.app.goo.gl/ubbjAkbkuDiGBpsN9?g_st=ic';
 
 type Countdown = {
   days: string;
@@ -282,7 +283,7 @@ export function EventVenues() {
 
                     {/* Directions */}
                     <Link
-                      href={mapLink}
+                        href={item.mapLink}
                       target="_blank"
                       rel="noopener noreferrer"
                       className={`mt-4 flex w-full items-center justify-center gap-2 rounded-full px-4 py-2.5 text-[10px] font-bold uppercase tracking-[0.12em] text-white shadow-sm transition-all ${accent.button}`}

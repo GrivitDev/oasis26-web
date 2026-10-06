@@ -23,5 +23,5 @@ export const distributionOfEucharisticElements = {
     },
   ],
 
-  images: ['/pro2.png', '/pro7.png', '/pro9.png'],
+  images: ['/pro2.png', '/pro7.png'],
 };

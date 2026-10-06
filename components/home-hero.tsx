@@ -36,10 +36,11 @@ const weddingEvents = [
 ];
 
 const accountDetails = {
-  bankName: 'Bank Name',
-  accountName: 'Joseph & Praise',
-  accountNumber: '0000000000',
+  bankName: 'Access bank',
+  accountName: 'Musa Joseph Nasara',
+  accountNumber: '1810279037',
 };
+
 
 export function HomeHero({
   backgroundImage = '/hero-bg.jpg',

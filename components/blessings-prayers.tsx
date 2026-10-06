@@ -2,7 +2,11 @@
 
 import { FormEvent, useEffect, useState } from 'react';
 import Image from 'next/image';
-import { Heart, Send } from 'lucide-react';
+import {
+  ChevronDown,
+  Heart,
+  Send,
+} from 'lucide-react';
 
 type BlessingEntry = {
   id: string;
@@ -21,18 +25,14 @@ type BlessingsResponse = {
 };
 
 export default function BlessingsPrayers() {
-  const [entries, setEntries] = useState<
-    BlessingEntry[]
-  >([]);
+  const [entries, setEntries] = useState<BlessingEntry[]>([]);
 
   const [name, setName] = useState('');
   const [message, setMessage] = useState('');
 
   const [loading, setLoading] = useState(true);
-  const [loadingMore, setLoadingMore] =
-    useState(false);
-  const [submitting, setSubmitting] =
-    useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
   const [hasMore, setHasMore] = useState(false);
 
@@ -43,18 +43,19 @@ export default function BlessingsPrayers() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
+  const [expandedBlessings, setExpandedBlessings] = useState<
+    Record<string, boolean>
+  >({});
+
   useEffect(() => {
     let active = true;
 
     const loadInitialEntries = async () => {
       try {
-        const response = await fetch(
-          '/api/blessings?limit=10',
-          {
-            method: 'GET',
-            cache: 'no-store',
-          },
-        );
+        const response = await fetch('/api/blessings?limit=10', {
+          method: 'GET',
+          cache: 'no-store',
+        });
 
         const data: BlessingsResponse | {
           error?: string;
@@ -69,8 +70,7 @@ export default function BlessingsPrayers() {
         }
 
         if (active) {
-          const result =
-            data as BlessingsResponse;
+          const result = data as BlessingsResponse;
 
           setEntries(result.entries || []);
           setHasMore(Boolean(result.hasMore));
@@ -447,33 +447,120 @@ export default function BlessingsPrayers() {
             </div>
           ) : (
             <>
-              <div className="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
-                {entries.map((entry) => (
-                  <article
-                    key={entry.id}
-                    className="relative overflow-hidden rounded-[16px] border border-wine/10 bg-ivory/75 p-3.5 shadow-sm backdrop-blur-sm transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md"
-                  >
-                    <div className="absolute left-0 top-0 h-full w-1 bg-emerald" />
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                {entries.map((entry) => {
+                  const isExpanded =
+                    Boolean(expandedBlessings[entry.id]);
 
-                    <div className="pl-2">
-                      <div className="flex items-start justify-between gap-2">
-                        <p className="font-[family-name:var(--font-cormorant)] text-base font-semibold leading-none text-wine">
-                          {entry.name}
-                        </p>
+                  /*
+                   * We use the actual rendered line clamp for the
+                   * three-line preview. This check determines whether
+                   * the Read More button should be shown.
+                   *
+                   * A message with explicit line breaks beyond three
+                   * lines is automatically considered expandable.
+                   */
+                  const hasMoreThanThreeLines =
+                    entry.message
+                      .trim()
+                      .split(/\r?\n/)
+                      .length > 3;
 
-                        <Heart className="mt-0.5 h-3 w-3 shrink-0 text-emerald" />
+                  return (
+                    <article
+                      key={entry.id}
+                      className="group relative overflow-hidden rounded-[20px] border border-wine/10 bg-ivory/80 p-4 shadow-[0_8px_24px_rgba(84,26,42,0.06)] backdrop-blur-sm transition-all duration-300 hover:-translate-y-0.5 hover:border-emerald/20 hover:shadow-[0_12px_30px_rgba(84,26,42,0.10)]"
+                    >
+                      {/* Decorative accent */}
+
+                      <div className="absolute left-0 top-0 h-full w-1 bg-gradient-to-b from-emerald via-mint-dark to-wine/30" />
+
+                      <div className="pl-2">
+                        {/* Header */}
+
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <p className="font-[family-name:var(--font-cormorant)] text-lg font-semibold leading-tight text-wine">
+                              {entry.name}
+                            </p>
+
+                            <div className="mt-1 flex items-center gap-1.5">
+                              <span className="h-px w-4 bg-emerald/40" />
+
+                              <span className="text-[6.5px] font-bold uppercase tracking-[0.16em] text-emerald/70">
+                                With love
+                              </span>
+                            </div>
+                          </div>
+
+                          <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-emerald/8">
+                            <Heart className="h-3 w-3 text-emerald" />
+                          </div>
+                        </div>
+
+                        {/* Message */}
+
+                        <div className="relative mt-3">
+                          <span className="pointer-events-none absolute -left-1 -top-2 font-[family-name:var(--font-cormorant)] text-3xl leading-none text-wine/10">
+                            “
+                          </span>
+
+                          <p
+                            className={`pl-2 text-[10px] leading-4.5 text-ink-soft ${
+                              !isExpanded &&
+                              hasMoreThanThreeLines
+                                ? 'line-clamp-3'
+                                : ''
+                            }`}
+                          >
+                            {entry.message}
+                          </p>
+                        </div>
+
+                        {/* Read more / less */}
+
+                        {hasMoreThanThreeLines && (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setExpandedBlessings(
+                                (current) => ({
+                                  ...current,
+                                  [entry.id]:
+                                    !current[entry.id],
+                                }),
+                              )
+                            }
+                            className="mt-2 inline-flex items-center gap-1 rounded-full px-2 py-1 text-[7px] font-bold uppercase tracking-[0.12em] text-emerald transition-colors hover:bg-emerald/8 hover:text-emerald-dark"
+                            aria-expanded={isExpanded}
+                          >
+                            {isExpanded
+                              ? 'Read less'
+                              : 'Read more'}
+
+                            <ChevronDown
+                              className={`h-3 w-3 transition-transform duration-300 ${
+                                isExpanded
+                                  ? 'rotate-180'
+                                  : ''
+                              }`}
+                            />
+                          </button>
+                        )}
+
+                        {/* Footer */}
+
+                        <div className="mt-3 flex items-center gap-2 border-t border-wine/8 pt-2.5">
+                          <span className="h-1 w-1 rounded-full bg-mint-dark" />
+
+                          <p className="text-[6.5px] font-semibold uppercase tracking-[0.12em] text-ink-soft/60">
+                            With love for Joseph &amp; Praise
+                          </p>
+                        </div>
                       </div>
-
-                      <p className="mt-2.5 whitespace-pre-wrap text-[10px] leading-4.5 text-ink-soft">
-                        {entry.message}
-                      </p>
-
-                      <p className="mt-2.5 text-[6.5px] font-semibold uppercase tracking-[0.12em] text-emerald/70">
-                        With love for Joseph &amp; Praise
-                      </p>
-                    </div>
-                  </article>
-                ))}
+                    </article>
+                  );
+                })}
               </div>
 
               {/* SEE MORE */}

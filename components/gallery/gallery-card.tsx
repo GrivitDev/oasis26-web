@@ -1,3 +1,5 @@
+// src/components/gallery/gallery-card.tsx
+
 'use client';
 
 import Image from 'next/image';
@@ -28,88 +30,81 @@ export type GalleryItem = {
 type GalleryCardProps = {
   item: GalleryItem;
   onOpen: (item: GalleryItem) => void;
-  onLiked?: () => void;
+  onLiked?: (likes: number) => void;
+  likesOverride?: number;
   priority?: boolean;
 };
+
+function getVideoPosterUrl(url: string): string | undefined {
+  if (!url.includes('res.cloudinary.com') || !url.includes('/video/upload/')) {
+    return undefined;
+  }
+
+  return url.replace(
+    '/video/upload/',
+    '/video/upload/so_0,q_auto,f_jpg,w_900/',
+  );
+}
 
 export default function GalleryCard({
   item,
   onOpen,
   onLiked,
+  likesOverride,
   priority = false,
 }: GalleryCardProps) {
-  const [likes, setLikes] = useState(
-    item.likes,
-  );
-
+  const [internalLikes, setInternalLikes] = useState(item.likes);
   const [liking, setLiking] = useState(false);
 
-  async function likeItem(
-    event: React.MouseEvent,
-  ) {
+  const likes = likesOverride ?? internalLikes;
+  const poster =
+    item.resourceType === 'video'
+      ? getVideoPosterUrl(item.secureUrl)
+      : undefined;
+
+  async function likeItem(event: React.MouseEvent) {
     event.stopPropagation();
 
-    if (liking) {
-      return;
-    }
+    if (liking || !item.secureUrl) return;
 
     try {
       setLiking(true);
 
-      const response = await fetch(
-        `/api/gallery/${item.id}/like`,
-        {
-          method: 'POST',
-        },
-      );
+      const response = await fetch(`/api/gallery/${item.id}/like`, {
+        method: 'POST',
+      });
 
       const data = await response.json();
 
       if (!response.ok) {
         throw new Error(
-          data.error ??
-            'Unable to like this item.',
+          data.error ?? 'Unable to like this item.',
         );
       }
 
-      setLikes(
-        Number(data.likes ?? likes),
-      );
-
-      onLiked?.();
+      const nextLikes = Number(data.likes ?? likes);
+      setInternalLikes(nextLikes);
+      onLiked?.(nextLikes);
     } catch (error) {
-      console.error(
-        'Gallery like error:',
-        error,
-      );
+      console.error('Gallery like error:', error);
     } finally {
       setLiking(false);
     }
   }
 
-  function downloadItem(
-    event: React.MouseEvent,
-  ) {
+  function downloadItem(event: React.MouseEvent) {
     event.stopPropagation();
 
-    const link =
-      document.createElement('a');
-
-    link.href =
-      `/api/gallery/${item.id}/download`;
-
-    link.download =
-      item.originalFilename ||
-      `oasis26-${item.id}`;
-
+    const link = document.createElement('a');
+    link.href = `/api/gallery/${item.id}/download`;
+    link.download = item.originalFilename || `oasis26-${item.id}`;
     document.body.appendChild(link);
     link.click();
     link.remove();
   }
 
   const aspectClass =
-    item.width &&
-    item.height
+    item.width && item.height
       ? item.height > item.width
         ? 'aspect-[3/4]'
         : item.width > item.height
@@ -117,8 +112,7 @@ export default function GalleryCard({
           : 'aspect-square'
       : 'aspect-square';
 
-  const hasMediaUrl =
-    Boolean(item.secureUrl);
+  const hasMediaUrl = Boolean(item.secureUrl);
 
   return (
     <article
@@ -127,9 +121,7 @@ export default function GalleryCard({
       <button
         type="button"
         onClick={() => {
-          if (hasMediaUrl) {
-            onOpen(item);
-          }
+          if (hasMediaUrl) onOpen(item);
         }}
         disabled={!hasMediaUrl}
         className="absolute inset-0 z-0 h-full w-full cursor-pointer disabled:cursor-default"
@@ -145,32 +137,32 @@ export default function GalleryCard({
               }
               fill
               sizes="(max-width: 640px) 33vw, (max-width: 1024px) 25vw, 16vw"
-              loading={
-                priority
-                  ? 'eager'
-                  : 'lazy'
-              }
+              priority={priority}
               className="object-cover transition duration-500 group-hover:scale-105"
             />
           ) : (
             <video
               src={item.secureUrl}
+              poster={poster}
               muted
               playsInline
-              preload="metadata"
+              preload="none"
               className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
+              aria-label={
+                item.originalFilename ||
+                "OASIS'26 gallery video"
+              }
             />
           ))}
 
         <span className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
       </button>
 
-      {item.resourceType === 'video' &&
-        hasMediaUrl && (
-          <span className="pointer-events-none absolute left-1/2 top-1/2 z-10 flex h-9 w-9 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-wine/80 text-white shadow-md backdrop-blur-sm sm:h-11 sm:w-11">
-            <Play className="ml-0.5 h-4 w-4 fill-current sm:h-5 sm:w-5" />
-          </span>
-        )}
+      {item.resourceType === 'video' && hasMediaUrl && (
+        <span className="pointer-events-none absolute left-1/2 top-1/2 z-10 flex h-9 w-9 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-wine/80 text-white shadow-md backdrop-blur-sm sm:h-11 sm:w-11">
+          <Play className="ml-0.5 h-4 w-4 fill-current sm:h-5 sm:w-5" />
+        </span>
+      )}
 
       <div className="absolute bottom-1.5 left-1.5 right-1.5 z-20 flex items-center justify-between gap-1 sm:bottom-2 sm:left-2 sm:right-2">
         <button
@@ -185,7 +177,6 @@ export default function GalleryCard({
           ) : (
             <Heart className="h-3 w-3" />
           )}
-
           <span>{likes}</span>
         </button>
 
@@ -210,3 +201,5 @@ export default function GalleryCard({
     </article>
   );
 }
+
+export { getVideoPosterUrl };

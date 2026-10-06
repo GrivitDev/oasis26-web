@@ -5,24 +5,27 @@ import type { MetadataRoute } from 'next';
 import { SEO } from '@/config/seo';
 
 export default function sitemap(): MetadataRoute.Sitemap {
-  return [
-    {
-      url: SEO.url,
-      lastModified: new Date(),
-      changeFrequency: 'weekly',
-      priority: 1,
-    },
-    {
-      url: `${SEO.url}/program`,
-      lastModified: new Date(),
-      changeFrequency: 'weekly',
-      priority: 0.9,
-    },
-    {
-      url: `${SEO.url}/gallery`,
-      lastModified: new Date(),
-      changeFrequency: 'weekly',
-      priority: 0.8,
-    },
+  const routes = [
+    '',
+    '/programs',
+    '/programs/traditional-wedding',
+    '/programs/church-wedding',
+    '/programs/church-photographs',
+    '/programs/reception',
+    '/gallery',
   ];
+
+  return routes.map((route, index) => ({
+    url: `${SEO.url}${route}`,
+    lastModified: new Date(),
+    changeFrequency: 'weekly',
+    priority:
+      index === 0
+        ? 1
+        : route === '/programs'
+          ? 0.9
+          : route === '/gallery'
+            ? 0.8
+            : 0.7,
+  }));
 }

@@ -6,6 +6,7 @@ import { OurStory } from '@/components/our-story';
 import { WeddingParty } from '@/components/wedding-party';
 import BlessingsPrayers from '@/components/blessings-prayers';
 import GalleryPreview from '@/components/gallery-preview';
+import ProgramPreview from '@/components/program-preview';
 
 export default function HomePage() {
   return (
@@ -17,9 +18,13 @@ export default function HomePage() {
 
       <OurStory />
 
+      <ProgramPreview variant="first" />
+
       <WeddingParty />
 
       <EventVenues />
+
+      <ProgramPreview variant="second" />
 
       <GalleryPreview />
 

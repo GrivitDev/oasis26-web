@@ -13,7 +13,7 @@ export const postCommunionSentence = {
   content: [
     {
       type: 'scripture' as const,
-      reference: '2 Corinthians 5:7',
+      reference: '2 Cor. 5:7',
       text: 'We live by faith, not by sight.',
     },
 

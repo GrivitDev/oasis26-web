@@ -1,9 +1,10 @@
 // src/config/seo.ts
 
 export const SEO = {
-  url:
+  url: (
     process.env.NEXT_PUBLIC_SITE_URL ??
-    'https://oasis2026.vercel.app/',
+    'https://oasis2026.vercel.app'
+  ).replace(/\/+$/, ''),
 
   title: "OASIS'26 | Joseph & Praise Wedding",
 
@@ -29,7 +30,7 @@ export const SEO = {
     'wedding RSVP',
   ],
 
-  image: '/og-image.jpg',
+  image: '/og-image.jpeg',
 
   siteName: "OASIS'26",
 
@@ -39,8 +40,9 @@ export const SEO = {
 
   author: {
     name: "OASIS'26",
-    url:
+    url: (
       process.env.NEXT_PUBLIC_SITE_URL ??
-      'https://oasis2026.vercel.app/',
+      'https://oasis2026.vercel.app'
+    ).replace(/\/+$/, ''),
   },
 } as const;

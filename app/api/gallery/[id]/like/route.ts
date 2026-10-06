@@ -20,9 +20,7 @@ export async function POST(
 
     if (!ObjectId.isValid(id)) {
       return NextResponse.json(
-        {
-          error: 'Invalid gallery item.',
-        },
+        { error: 'Invalid gallery item.' },
         { status: 400 },
       );
     }
@@ -30,45 +28,35 @@ export async function POST(
     const client = await clientPromise;
     const db = client.db(process.env.MONGODB_DB);
 
-    const result = await db
-      .collection('gallery')
-      .findOneAndUpdate(
-        {
-          _id: new ObjectId(id),
-        },
-        {
-          $inc: {
-            likes: 1,
-          },
-        },
-        {
-          returnDocument: 'after',
-        },
-      );
+    const result = await db.collection('gallery').findOneAndUpdate(
+      { _id: new ObjectId(id) },
+      { $inc: { likes: 1 } },
+      { returnDocument: 'after' },
+    );
 
     if (!result) {
       return NextResponse.json(
-        {
-          error: 'Gallery item not found.',
-        },
+        { error: 'Gallery item not found.' },
         { status: 404 },
       );
     }
 
-    return NextResponse.json({
-      success: true,
-      likes: result.likes ?? 0,
-    });
-  } catch (error) {
-    console.error(
-      'Gallery like error:',
-      error,
-    );
-
     return NextResponse.json(
       {
-        error: 'Unable to like this item.',
+        success: true,
+        likes: Number(result.likes ?? 0),
       },
+      {
+        headers: {
+          'Cache-Control': 'no-store',
+        },
+      },
+    );
+  } catch (error) {
+    console.error('Gallery like error:', error);
+
+    return NextResponse.json(
+      { error: 'Unable to like this item.' },
       { status: 500 },
     );
   }

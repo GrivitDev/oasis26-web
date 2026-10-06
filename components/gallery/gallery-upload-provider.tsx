@@ -10,38 +10,26 @@ import {
 } from 'lucide-react';
 import {
   createContext,
+  useCallback,
   useContext,
   useRef,
   useState,
   type ReactNode,
 } from 'react';
 
+import {
+  completeGalleryUpload,
+  requestGalleryUploadSignature,
+  uploadGalleryFileToCloudinary,
+} from '@/lib/gallery-upload-client';
+import {
+  MAX_SELECTION_COUNT,
+  validateGalleryUploadFile,
+} from '@/lib/gallery';
+
 type GallerySection =
   | 'pre-wedding'
   | 'live';
-
-type UploadSignatureResponse = {
-  cloudName: string;
-  apiKey: string;
-  timestamp: number;
-  signature: string;
-  folder: string;
-  publicId: string;
-  resourceType:
-    | 'image'
-    | 'video';
-};
-
-type CloudinaryUploadResponse = {
-  public_id: string;
-  secure_url: string;
-  resource_type:
-    | 'image'
-    | 'video';
-  width?: number;
-  height?: number;
-  duration?: number;
-};
 
 type UploadItemStatus =
   | 'queued'
@@ -63,291 +51,31 @@ type UploadQueueItem = {
   id: string;
   file: File;
   section: GallerySection;
+  uploadToken?: string;
+  status: UploadItemStatus;
+  progress: number;
 };
 
 type GalleryUploadContextValue = {
   isUploading: boolean;
   startUpload: (
     section: GallerySection,
-    files: Array<{
-      id: string;
-      file: File;
-    }>,
+    files: Array<{ id: string; file: File }>,
+    uploadToken?: string,
   ) => boolean;
 };
 
 const GalleryUploadContext =
-  createContext<
-    GalleryUploadContextValue | undefined
-  >(undefined);
+  createContext<GalleryUploadContextValue | undefined>(undefined);
 
-const MAX_SELECTION_COUNT = 25;
+const MAX_CONCURRENT_UPLOADS = 2;
 
-function updateItemState(
-  setter: React.Dispatch<
-    React.SetStateAction<UploadItem[]>
-  >,
-  id: string,
-  update: Partial<UploadItem>,
-) {
-  setter((current) =>
-    current.map((item) =>
-      item.id === id
-        ? {
-            ...item,
-            ...update,
-          }
-        : item,
-    ),
-  );
-}
-
-async function requestUploadSignature(
-  resourceType: 'image' | 'video',
-  section: GallerySection,
-): Promise<UploadSignatureResponse> {
-  const response =
-    await fetch(
-      '/api/gallery/upload',
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type':
-            'application/json',
-        },
-        body: JSON.stringify({
-          action: 'sign',
-          section,
-          resourceType,
-        }),
-      },
-    );
-
-  let data:
-    | UploadSignatureResponse
-    | { error?: string };
-
-  try {
-    data =
-      await response.json();
-  } catch {
-    throw new Error(
-      'Unable to prepare the upload.',
-    );
+function formatFileSize(bytes: number) {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) {
+    return `${(bytes / 1024).toFixed(1)} KB`;
   }
-
-  if (!response.ok) {
-    throw new Error(
-      'error' in data &&
-      data.error
-        ? data.error
-        : 'Unable to prepare the upload.',
-    );
-  }
-
-  return data as UploadSignatureResponse;
-}
-
-async function uploadToCloudinary(
-  file: File,
-  uploadSignature: UploadSignatureResponse,
-  onProgress: (
-    loaded: number,
-    total: number,
-  ) => void,
-): Promise<CloudinaryUploadResponse> {
-  const resourceType =
-    uploadSignature.resourceType;
-
-  const cloudinaryFormData =
-    new FormData();
-
-  cloudinaryFormData.append(
-    'file',
-    file,
-  );
-
-  cloudinaryFormData.append(
-    'api_key',
-    uploadSignature.apiKey,
-  );
-
-  cloudinaryFormData.append(
-    'timestamp',
-    String(
-      uploadSignature.timestamp,
-    ),
-  );
-
-  cloudinaryFormData.append(
-    'signature',
-    uploadSignature.signature,
-  );
-
-  cloudinaryFormData.append(
-    'folder',
-    uploadSignature.folder,
-  );
-
-  cloudinaryFormData.append(
-    'public_id',
-    uploadSignature.publicId,
-  );
-
-  const cloudinaryUploadUrl =
-    `https://api.cloudinary.com/v1_1/${uploadSignature.cloudName}/${resourceType}/upload`;
-
-  return new Promise(
-    (resolve, reject) => {
-      const xhr =
-        new XMLHttpRequest();
-
-      xhr.open(
-        'POST',
-        cloudinaryUploadUrl,
-      );
-
-      xhr.upload.onprogress =
-        (event) => {
-          if (
-            !event.lengthComputable
-          ) {
-            return;
-          }
-
-          onProgress(
-            event.loaded,
-            event.total,
-          );
-        };
-
-      xhr.onload = () => {
-        let response:
-          | CloudinaryUploadResponse
-          | {
-              error?: {
-                message?: string;
-              };
-            }
-          | null = null;
-
-        try {
-          response =
-            JSON.parse(
-              xhr.responseText,
-            );
-        } catch {
-          response = null;
-        }
-
-        if (
-          xhr.status >= 200 &&
-          xhr.status < 300 &&
-          response &&
-          'public_id' in response
-        ) {
-          resolve(
-            response as CloudinaryUploadResponse,
-          );
-
-          return;
-        }
-
-        const cloudinaryError =
-          response &&
-          'error' in response
-            ? response.error
-                ?.message
-            : undefined;
-
-        reject(
-          new Error(
-            cloudinaryError ||
-              'Cloudinary upload failed.',
-          ),
-        );
-      };
-
-      xhr.onerror = () => {
-        reject(
-          new Error(
-            'Network error while uploading to Cloudinary.',
-          ),
-        );
-      };
-
-      xhr.onabort = () => {
-        reject(
-          new Error(
-            'Upload was cancelled.',
-          ),
-        );
-      };
-
-      xhr.send(
-        cloudinaryFormData,
-      );
-    },
-  );
-}
-
-async function completeGalleryUpload(
-  section: GallerySection,
-  cloudinaryResult: CloudinaryUploadResponse,
-  uploadFile: File,
-) {
-  const response =
-    await fetch(
-      '/api/gallery/upload',
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type':
-            'application/json',
-        },
-        body: JSON.stringify({
-          action: 'complete',
-          section,
-          publicId:
-            cloudinaryResult.public_id,
-          secureUrl:
-            cloudinaryResult.secure_url,
-          resourceType:
-            cloudinaryResult.resource_type,
-          originalFilename:
-            uploadFile.name,
-          width:
-            cloudinaryResult.width,
-          height:
-            cloudinaryResult.height,
-          duration:
-            cloudinaryResult.duration,
-        }),
-      },
-    );
-
-  let data:
-    | {
-        item?: unknown;
-        error?: string;
-      }
-    | null = null;
-
-  try {
-    data =
-      await response.json();
-  } catch {
-    data = null;
-  }
-
-  if (!response.ok) {
-    throw new Error(
-      data?.error ||
-        'Unable to save the gallery item.',
-    );
-  }
-
-  return data;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
 function GalleryUploadStatusBar({
@@ -367,63 +95,38 @@ function GalleryUploadStatusBar({
   failedCount: number;
   onClose: () => void;
 }) {
-  const [
-    expanded,
-    setExpanded,
-  ] = useState(false);
+  const [expanded, setExpanded] = useState(false);
 
-  if (!items.length) {
-    return null;
-  }
+  if (!items.length) return null;
 
   const currentItem =
-    items.find(
-      (item) =>
-        item.status ===
-        'uploading',
-    ) ??
-    items.find(
-      (item) =>
-        item.status ===
-        'processing',
-    ) ??
-    items.find(
-      (item) =>
-        item.status ===
-        'queued',
-    );
+    items.find((item) => item.status === 'uploading') ??
+    items.find((item) => item.status === 'processing') ??
+    items.find((item) => item.status === 'queued');
 
-  const title =
-    uploading
-      ? 'Uploading memories'
-      : finished
-        ? failedCount > 0
-          ? 'Upload finished with errors'
-          : 'Upload complete'
-        : 'Upload';
+  const title = uploading
+    ? 'Uploading memories'
+    : finished
+      ? failedCount > 0
+        ? 'Upload finished with errors'
+        : 'Upload complete'
+      : 'Upload';
 
-  const subtitle =
-    uploading
-      ? currentItem
-        ? currentItem.status ===
-          'processing'
-          ? `Saving ${currentItem.name}`
-          : currentItem.name
-        : `${completedCount} of ${items.length} completed`
-      : finished
-        ? `${completedCount} of ${items.length} uploaded successfully${
-            failedCount > 0
-              ? ` • ${failedCount} failed`
-              : ''
-          }`
-        : `${completedCount} of ${items.length} completed`;
+  const subtitle = uploading
+    ? currentItem
+      ? currentItem.status === 'processing'
+        ? `Saving ${currentItem.name}`
+        : currentItem.name
+      : `${completedCount} of ${items.length} completed`
+    : finished
+      ? `${completedCount} of ${items.length} uploaded successfully${
+          failedCount > 0 ? ` • ${failedCount} failed` : ''
+        }`
+      : `${completedCount} of ${items.length} completed`;
 
   return (
     <div className="pointer-events-none fixed left-3 top-[calc(4.5rem+env(safe-area-inset-top))] z-[2147483647] w-[calc(100%-1.5rem)] max-w-lg sm:left-5 sm:top-[5.25rem] sm:w-[calc(100%-2.5rem)]">
       <div className="pointer-events-auto overflow-hidden rounded-[18px] border border-sand-dark/70 bg-cream shadow-[0_12px_40px_rgba(0,0,0,0.18)] backdrop-blur-xl">
-
-        {/* MAIN BAR */}
-
         <div className="flex items-center gap-2.5 px-3 py-2.5 sm:px-3.5 sm:py-3">
           <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-wine/10 text-wine">
             {finished ? (
@@ -435,31 +138,20 @@ function GalleryUploadStatusBar({
 
           <button
             type="button"
-            onClick={() =>
-              setExpanded(
-                (current) =>
-                  !current,
-              )
-            }
+            onClick={() => setExpanded((current) => !current)}
             className="min-w-0 flex-1 text-left"
-            aria-expanded={
-              expanded
-            }
+            aria-expanded={expanded}
           >
             <div className="flex items-center gap-1.5">
               <p className="truncate text-[9px] font-bold uppercase tracking-[0.1em] text-wine">
                 {title}
               </p>
-
               <ChevronDown
                 className={`h-3 w-3 shrink-0 text-ink-soft transition-transform duration-200 ${
-                  expanded
-                    ? 'rotate-180'
-                    : ''
+                  expanded ? 'rotate-180' : ''
                 }`}
               />
             </div>
-
             <p className="mt-0.5 truncate text-[8px] text-ink-soft">
               {subtitle}
             </p>
@@ -469,19 +161,15 @@ function GalleryUploadStatusBar({
             <p className="text-[10px] font-bold text-wine">
               {overallProgress}%
             </p>
-
             <p className="text-[6px] font-semibold uppercase tracking-[0.08em] text-ink-soft">
-              {completedCount}/
-              {items.length}
+              {completedCount}/{items.length}
             </p>
           </div>
 
           {finished && (
             <button
               type="button"
-              onClick={
-                onClose
-              }
+              onClick={onClose}
               className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-ink/5 text-ink-soft transition hover:bg-wine/10 hover:text-wine"
               aria-label="Close upload status"
             >
@@ -490,111 +178,69 @@ function GalleryUploadStatusBar({
           )}
         </div>
 
-        {/* OVERALL PROGRESS */}
-
         <div className="h-1 bg-sand">
           <div
             className={`h-full transition-all duration-200 ${
-              finished &&
-              failedCount ===
-                0
-                ? 'bg-emerald'
-                : 'bg-wine'
+              finished && failedCount === 0 ? 'bg-emerald' : 'bg-wine'
             }`}
-            style={{
-              width: `${overallProgress}%`,
-            }}
+            style={{ width: `${overallProgress}%` }}
           />
         </div>
-
-        {/* DETAILS */}
 
         {expanded && (
           <div className="border-t border-sand-dark/50 bg-white/65 px-2.5 py-2.5">
             <div className="max-h-[45vh] space-y-1.5 overflow-y-auto">
-              {items.map(
-                (item) => (
-                  <div
-                    key={
-                      item.id
-                    }
-                    className="rounded-[12px] border border-sand-dark/40 bg-cream/65 px-2.5 py-2"
-                  >
-                    <div className="flex items-center gap-2">
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate text-[8px] font-semibold text-ink">
-                          {
-                            item.name
-                          }
-                        </p>
-
-                        <p className="mt-0.5 text-[6px] text-ink-soft">
-                          {formatFileSize(
-                            item.size,
-                          )}
-                        </p>
-                      </div>
-
-                      <div className="shrink-0 text-[6px] font-bold uppercase tracking-[0.08em]">
-                        {item.status ===
-                        'completed' ? (
-                          <span className="text-emerald">
-                            Complete
-                          </span>
-                        ) : item.status ===
-                          'failed' ? (
-                          <span className="text-wine">
-                            Failed
-                          </span>
-                        ) : item.status ===
-                          'processing' ? (
-                          <span className="text-emerald">
-                            Saving
-                          </span>
-                        ) : item.status ===
-                          'uploading' ? (
-                          <span className="text-wine">
-                            {item.progress}%
-                          </span>
-                        ) : (
-                          <span className="text-ink-soft">
-                            Queued
-                          </span>
-                        )}
-                      </div>
+              {items.map((item) => (
+                <div
+                  key={item.id}
+                  className="rounded-[12px] border border-sand-dark/40 bg-cream/65 px-2.5 py-2"
+                >
+                  <div className="flex items-center gap-2">
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-[8px] font-semibold text-ink">
+                        {item.name}
+                      </p>
+                      <p className="mt-0.5 text-[6px] text-ink-soft">
+                        {formatFileSize(item.size)}
+                      </p>
                     </div>
 
-                    {(item.status ===
-                      'uploading' ||
-                      item.status ===
-                        'processing') && (
-                      <div className="mt-1.5 h-1 overflow-hidden rounded-full bg-sand">
-                        <div
-                          className={`h-full rounded-full ${
-                            item.status ===
-                            'processing'
-                              ? 'animate-pulse bg-emerald'
-                              : 'bg-wine'
-                          }`}
-                          style={{
-                            width: `${item.progress}%`,
-                          }}
-                        />
-                      </div>
-                    )}
-
-                    {item.status ===
-                      'failed' &&
-                      item.error && (
-                        <p className="mt-1 text-[6px] leading-3 text-wine">
-                          {
-                            item.error
-                          }
-                        </p>
+                    <div className="shrink-0 text-[6px] font-bold uppercase tracking-[0.08em]">
+                      {item.status === 'completed' ? (
+                        <span className="text-emerald">Complete</span>
+                      ) : item.status === 'failed' ? (
+                        <span className="text-wine">Failed</span>
+                      ) : item.status === 'processing' ? (
+                        <span className="text-emerald">Saving</span>
+                      ) : item.status === 'uploading' ? (
+                        <span className="text-wine">{item.progress}%</span>
+                      ) : (
+                        <span className="text-ink-soft">Queued</span>
                       )}
+                    </div>
                   </div>
-                ),
-              )}
+
+                  {(item.status === 'uploading' ||
+                    item.status === 'processing') && (
+                    <div className="mt-1.5 h-1 overflow-hidden rounded-full bg-sand">
+                      <div
+                        className={`h-full rounded-full ${
+                          item.status === 'processing'
+                            ? 'animate-pulse bg-emerald'
+                            : 'bg-wine'
+                        }`}
+                        style={{ width: `${item.progress}%` }}
+                      />
+                    </div>
+                  )}
+
+                  {item.status === 'failed' && item.error && (
+                    <p className="mt-1 text-[6px] leading-3 text-wine">
+                      {item.error}
+                    </p>
+                  )}
+                </div>
+              ))}
             </div>
 
             {uploading && (
@@ -609,283 +255,284 @@ function GalleryUploadStatusBar({
   );
 }
 
-export function GalleryUploadProvider({
-  children,
-}: {
-  children: ReactNode;
-}) {
-  const [isUploading, setIsUploading] =
-    useState(false);
+export function GalleryUploadProvider({ children }: { children: ReactNode }) {
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadItems, setUploadItems] = useState<UploadItem[]>([]);
+  const [finished, setFinished] = useState(false);
+  const [overallProgress, setOverallProgress] = useState(0);
 
-  const [uploadItems, setUploadItems] =
-    useState<UploadItem[]>([]);
+  const queueRef = useRef<UploadQueueItem[]>([]);
+  const processingRef = useRef(false);
 
-  const [finished, setFinished] =
-    useState(false);
-
-  const [overallProgress, setOverallProgress] =
-    useState(0);
-
-  const queueRef =
-    useRef<UploadQueueItem[]>([]);
-
-  async function processQueue(
-    queue: UploadQueueItem[],
-  ) {
-    const totalBytes =
-      queue.reduce(
-        (total, item) =>
-          total +
-          item.file.size,
-        0,
+  const updateState = useCallback(
+    (id: string, update: Partial<UploadItem>) => {
+      setUploadItems((current) =>
+        current.map((item) =>
+          item.id === id ? { ...item, ...update } : item,
+        ),
       );
 
-    let completedBytes = 0;
-    let completedCount = 0;
-    let failedCount = 0;
+      const queueItem = queueRef.current.find((item) => item.id === id);
+      if (queueItem) {
+        Object.assign(queueItem, update);
+      }
+    },
+    [],
+  );
 
-    for (
-      const queueItem of queue
-    ) {
-      updateItemState(
-        setUploadItems,
-        queueItem.id,
-        {
-          status:
-            'uploading',
-          progress: 0,
-          error:
-            undefined,
-        },
-      );
+  const recalculateOverallProgress = useCallback(() => {
+    const queue = queueRef.current;
+    const totalBytes = queue.reduce((sum, item) => sum + item.file.size, 0);
 
+    if (!totalBytes) {
+      setOverallProgress(0);
+      return;
+    }
+
+    const progressBytes = queue.reduce(
+      (sum, item) => sum + item.file.size * (item.progress / 100),
+      0,
+    );
+
+    setOverallProgress(Math.min(100, Math.round((progressBytes / totalBytes) * 100)));
+  }, []);
+
+  const processItem = useCallback(
+    async (queueItem: UploadQueueItem) => {
       try {
-        const isVideo =
-          queueItem.file.type.startsWith(
-            'video/',
-          );
+        const resourceType = queueItem.file.type.startsWith('video/')
+          ? 'video'
+          : 'image';
 
-        const resourceType:
-          | 'image'
-          | 'video' =
-          isVideo
-            ? 'video'
-            : 'image';
+        updateState(queueItem.id, {
+          status: 'uploading',
+          progress: 0,
+          error: undefined,
+        });
+        recalculateOverallProgress();
 
-        const uploadSignature =
-          await requestUploadSignature(
-            resourceType,
-            queueItem.section,
-          );
+        const signature = await requestGalleryUploadSignature(
+          resourceType,
+          queueItem.section,
+          queueItem.uploadToken,
+        );
 
-        const cloudinaryResult =
-          await uploadToCloudinary(
-            queueItem.file,
-            uploadSignature,
-            (
-              loaded,
-              total,
-            ) => {
-              const itemProgress =
-                total > 0
-                  ? Math.round(
-                      (loaded /
-                        total) *
-                        100,
-                    )
-                  : 0;
+        const cloudinaryResult = await uploadGalleryFileToCloudinary(
+          queueItem.file,
+          signature,
+          (loaded, total) => {
+            const progress = total > 0
+              ? Math.min(99, Math.round((loaded / total) * 100))
+              : 0;
 
-              updateItemState(
-                setUploadItems,
-                queueItem.id,
-                {
-                  status:
-                    'uploading',
-                  progress:
-                    Math.min(
-                      itemProgress,
-                      99,
-                    ),
-                },
-              );
-
-              const overallProgressValue =
-                totalBytes > 0
-                  ? Math.round(
-                      ((completedBytes +
-                        loaded) /
-                        totalBytes) *
-                        100,
-                    )
-                  : 0;
-
-              setOverallProgress(
-                Math.min(
-                  overallProgressValue,
-                  99,
-                ),
-              );
-            },
-          );
-
-        updateItemState(
-          setUploadItems,
-          queueItem.id,
-          {
-            status:
-              'processing',
-            progress: 99,
+            updateState(queueItem.id, {
+              status: 'uploading',
+              progress,
+            });
+            recalculateOverallProgress();
           },
         );
+
+        updateState(queueItem.id, {
+          status: 'processing',
+          progress: 99,
+        });
+        recalculateOverallProgress();
 
         await completeGalleryUpload(
           queueItem.section,
           cloudinaryResult,
           queueItem.file,
+          queueItem.uploadToken,
         );
 
-        completedBytes +=
-          queueItem.file.size;
-
-        completedCount +=
-          1;
-
-        updateItemState(
-          setUploadItems,
-          queueItem.id,
-          {
-            status:
-              'completed',
-            progress: 100,
-          },
-        );
-
-        setOverallProgress(
-          totalBytes > 0
-            ? Math.round(
-                (completedBytes /
-                  totalBytes) *
-                  100,
-              )
-            : 100,
-        );
+        updateState(queueItem.id, {
+          status: 'completed',
+          progress: 100,
+        });
+        recalculateOverallProgress();
       } catch (error) {
-        failedCount += 1;
-
         const message =
           error instanceof Error
             ? error.message
             : 'Unable to upload this file.';
 
-        completedBytes +=
-          queueItem.file.size;
-
-        updateItemState(
-          setUploadItems,
-          queueItem.id,
-          {
-            status:
-              'failed',
-            progress: 0,
-            error: message,
-          },
-        );
-
-        setOverallProgress(
-          totalBytes > 0
-            ? Math.round(
-                (completedBytes /
-                  totalBytes) *
-                  100,
-              )
-            : 100,
-        );
+        updateState(queueItem.id, {
+          status: 'failed',
+          progress: 100,
+          error: message,
+        });
+        recalculateOverallProgress();
       }
+    },
+    [recalculateOverallProgress, updateState],
+  );
 
-      void completedCount;
+  const processQueue = useCallback(async () => {
+    if (processingRef.current) {
+      return;
     }
 
-    setOverallProgress(100);
-    setIsUploading(false);
-    setFinished(true);
-    queueRef.current = [];
+    processingRef.current = true;
 
-    window.dispatchEvent(
-      new CustomEvent(
-        'gallery-upload-complete',
-        {
+    try {
+      while (true) {
+        const activeCount = queueRef.current.filter(
+          (item) =>
+            item.status === 'uploading' || item.status === 'processing',
+        ).length;
+
+        const queued = queueRef.current.filter(
+          (item) => item.status === 'queued',
+        );
+
+        if (activeCount === 0 && queued.length === 0) {
+          break;
+        }
+
+        const availableSlots = Math.max(
+          0,
+          MAX_CONCURRENT_UPLOADS - activeCount,
+        );
+
+        const nextItems = queued.slice(0, availableSlots);
+
+        if (!nextItems.length) {
+          await new Promise((resolve) => setTimeout(resolve, 50));
+          continue;
+        }
+
+        nextItems.forEach((item) => {
+          item.status = 'uploading';
+        });
+
+        await Promise.all(
+          nextItems.map((item) => processItem(item)),
+        );
+      }
+    } finally {
+      processingRef.current = false;
+
+      const hasPending = queueRef.current.some(
+        (item) =>
+          item.status === 'queued' ||
+          item.status === 'uploading' ||
+          item.status === 'processing',
+      );
+
+      if (hasPending) {
+        void processQueue();
+        return;
+      }
+
+      setOverallProgress(100);
+      setIsUploading(false);
+      setFinished(true);
+
+      const completedCount = queueRef.current.filter(
+        (item) => item.status === 'completed',
+      ).length;
+
+      const failedCount = queueRef.current.filter(
+        (item) => item.status === 'failed',
+      ).length;
+
+      const sections = Array.from(
+        new Set(queueRef.current.map((item) => item.section)),
+      );
+
+      window.dispatchEvent(
+        new CustomEvent('gallery-upload-complete', {
           detail: {
-            sections: Array.from(
-              new Set(
-                queue.map(
-                  (item) =>
-                    item.section,
-                ),
-              ),
-            ),
+            sections,
             completedCount,
             failedCount,
           },
-        },
-      ),
-    );
-  }
-
-  function startUpload(
-    section: GallerySection,
-    files: Array<{
-      id: string;
-      file: File;
-    }>,
-  ): boolean {
-    if (
-      isUploading ||
-      files.length === 0 ||
-      files.length >
-        MAX_SELECTION_COUNT
-    ) {
-      return false;
-    }
-
-    const queue =
-      files.map(
-        (item) => ({
-          id: item.id,
-          file: item.file,
-          section,
         }),
       );
+    }
+  }, [processItem]);
 
-    queueRef.current =
-      queue;
+  const startUpload = useCallback(
+    (
+      section: GallerySection,
+      files: Array<{ id: string; file: File }>,
+      uploadToken?: string,
+    ): boolean => {
+      if (!files.length || files.length > MAX_SELECTION_COUNT) {
+        return false;
+      }
 
-    setUploadItems(
-      queue.map(
-        (item) => ({
-          id: item.id,
-          name:
-            item.file.name,
-          size:
-            item.file.size,
-          status:
-            'queued',
-          progress: 0,
-        }),
-      ),
-    );
+      const invalidFile = files.find((item) =>
+        validateGalleryUploadFile(item.file, section),
+      );
 
-    setOverallProgress(0);
-    setFinished(false);
-    setIsUploading(true);
+      if (invalidFile) {
+        console.error(
+          `${invalidFile.file.name}: ${validateGalleryUploadFile(
+            invalidFile.file,
+            section,
+          )}`,
+        );
+        return false;
+      }
 
-    void processQueue(
-      queue,
-    );
+      if (
+        section === 'pre-wedding' &&
+        !uploadToken?.trim()
+      ) {
+        return false;
+      }
 
-    return true;
-  }
+      const queueItems: UploadQueueItem[] = files.map((item) => ({
+        id: item.id,
+        file: item.file,
+        section,
+        uploadToken: uploadToken?.trim() || undefined,
+        status: 'queued',
+        progress: 0,
+      }));
 
-  function closeFinishedStatus() {
+      const wasIdle = !isUploading;
+
+      if (wasIdle) {
+        setUploadItems(
+          queueItems.map((item) => ({
+            id: item.id,
+            name: item.file.name,
+            size: item.file.size,
+            status: 'queued',
+            progress: 0,
+          })),
+        );
+        setOverallProgress(0);
+        setFinished(false);
+        queueRef.current = queueItems;
+      } else {
+        setUploadItems((current) => [
+          ...current,
+          ...queueItems.map((item) => ({
+            id: item.id,
+            name: item.file.name,
+            size: item.file.size,
+            status: 'queued' as const,
+            progress: 0,
+          })),
+        ]);
+        queueRef.current = [
+          ...queueRef.current,
+          ...queueItems,
+        ];
+      }
+
+      setIsUploading(true);
+      void processQueue();
+      return true;
+    },
+    [isUploading, processQueue],
+  );
+
+  const closeFinishedStatus = useCallback(() => {
     if (isUploading) {
       return;
     }
@@ -894,14 +541,11 @@ export function GalleryUploadProvider({
     setFinished(false);
     setOverallProgress(0);
     queueRef.current = [];
-  }
+  }, [isUploading]);
 
   return (
     <GalleryUploadContext.Provider
-      value={{
-        isUploading,
-        startUpload,
-      }}
+      value={{ isUploading, startUpload }}
     >
       {children}
 
@@ -909,36 +553,21 @@ export function GalleryUploadProvider({
         items={uploadItems}
         uploading={isUploading}
         finished={finished}
-        overallProgress={
-          overallProgress
-        }
-        completedCount={
-          uploadItems.filter(
-            (item) =>
-              item.status ===
-              'completed',
-          ).length
-        }
-        failedCount={
-          uploadItems.filter(
-            (item) =>
-              item.status ===
-              'failed',
-          ).length
-        }
-        onClose={
-          closeFinishedStatus
-        }
+        overallProgress={overallProgress}
+        completedCount={uploadItems.filter(
+          (item) => item.status === 'completed',
+        ).length}
+        failedCount={uploadItems.filter(
+          (item) => item.status === 'failed',
+        ).length}
+        onClose={closeFinishedStatus}
       />
     </GalleryUploadContext.Provider>
   );
 }
 
 export function useGalleryUpload() {
-  const context =
-    useContext(
-      GalleryUploadContext,
-    );
+  const context = useContext(GalleryUploadContext);
 
   if (!context) {
     throw new Error(
@@ -947,27 +576,4 @@ export function useGalleryUpload() {
   }
 
   return context;
-}
-
-function formatFileSize(
-  bytes: number,
-) {
-  if (bytes < 1024) {
-    return `${bytes} B`;
-  }
-
-  if (
-    bytes <
-    1024 * 1024
-  ) {
-    return `${(
-      bytes /
-      1024
-    ).toFixed(1)} KB`;
-  }
-
-  return `${(
-    bytes /
-    (1024 * 1024)
-  ).toFixed(1)} MB`;
 }

@@ -6,7 +6,7 @@ export const acclamation = {
   title: 'The Acclamation',
 
   description:
-    'An acclamation in which the groom’s family formally receives Praise into the family and makes a commitment of prayer and moral support.',
+    'The acclamation following the marriage, including the formal reception of the bride into the groom’s family.',
 
   type: 'ceremony' as const,
 
@@ -17,35 +17,25 @@ export const acclamation = {
     },
 
     {
-      type: 'subheading' as const,
-      text: '(i)',
-    },
-
-    {
       type: 'instruction' as const,
-      text: 'The parents of the bridegroom or their representatives will move forward.',
+      text: '(i) (The Parents of the bridegroom or their representatives will move forward.)',
     },
 
     {
       type: 'dialogue' as const,
       speaker: 'Priest',
-      text: 'In the name of God and in the presence of this congregation we hand over Praise Ajawo now Mrs. Praise Joe-Musa to you as a full member of your family. Will you promise on behalf of your family to continue to uphold them in your prayer and give them your moral support?',
+      text: 'In the name of God and in the presence of this congregation we hand over Praise Ajawo now Mrs. Praise Joe-Musa to you as a full member of your family. Will you promise on behalf of your family to continue to up-hold them in your prayer and give them your moral support?',
     },
 
     {
       type: 'dialogue' as const,
       speaker: 'The Parents of Groom',
-      text: 'We promise in the name of God.',
-    },
-
-    {
-      type: 'subheading' as const,
-      text: '(ii)',
+      text: 'We promise in the name of God',
     },
 
     {
       type: 'instruction' as const,
-      text: 'The Priest then prays for the family.',
+      text: '(ii) The Priest then prays for the family.',
     },
 
     {

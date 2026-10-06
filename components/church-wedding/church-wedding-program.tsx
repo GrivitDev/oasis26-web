@@ -30,6 +30,7 @@ import { distributionOfEucharisticElements } from './distribution-of-eucharistic
 import { communionDistribution } from './communion-distribution.config';
 import { communionHymns } from './communion-hymns.config';
 import { ablutionHymn } from './ablution-hymn.config';
+import { postCommunionHymn } from './post-communion-hymn.config';
 import { postCommunionSentence } from './post-communion-sentence.config';
 import { postCommunionPrayers } from './post-communion-prayers.config';
 import { conclusion } from './conclusion.config';
@@ -49,38 +50,38 @@ const programmeItems: ChurchWeddingConfig[] = [
   theMarriage as ChurchWeddingConfig,
   acclamation,
   hymnTheVoiceThatBreathedOerEden,
-
   {
     ...ministryOfTheWord,
-
     content: [
       ...(Array.isArray(ministryOfTheWord.content)
         ? ministryOfTheWord.content
         : []),
-
       {
         type: 'subsection',
         number: '08A',
         title: oldTestamentGenesis21825.title,
-        content: buildScriptureBlocks(oldTestamentGenesis21825),
+        content: Array.isArray(oldTestamentGenesis21825.content)
+          ? oldTestamentGenesis21825.content
+          : [],
       },
-
       {
         type: 'subsection',
         number: '08B',
         title: psalm128.title,
-        content: buildScriptureBlocks(psalm128),
+        content: Array.isArray(psalm128.content)
+          ? psalm128.content
+          : [],
       },
-
       {
         type: 'subsection',
         number: '08C',
         title: epistleEphesians52133.title,
-        content: buildScriptureBlocks(epistleEphesians52133),
+        content: Array.isArray(epistleEphesians52133.content)
+          ? epistleEphesians52133.content
+          : [],
       },
     ],
   },
-
   gradualHymnGodGiveUsChristianHomes,
   gospelMatthew72129,
   sermon,
@@ -94,6 +95,7 @@ const programmeItems: ChurchWeddingConfig[] = [
   communionDistribution,
   communionHymns,
   ablutionHymn,
+  postCommunionHymn,
   postCommunionSentence,
   postCommunionPrayers,
   conclusion,
@@ -105,7 +107,41 @@ const ministers = [
   'All Supervising Priests',
   'Ven. J. Ogunmola (Assisting Priest)',
   'Ven. Dr. J. C. Egbeja (Vicar)',
-  'The Most Rev. Dr. Emmanuel A.S. Egbunu — Diocesan Bishop',
+  'The Most Rev. Dr. Emmanuel A.S. Egbunu',
+  'Diocesan Bishop',
+];
+
+const serviceOverview = [
+  'Processional Hymn-WC: 283 (PRAISE my Soul the King of heaven)',
+  'Introduction',
+  'Charge and declaration',
+  'Hymn- WC: 13 (ALL to Jesus I surrender)',
+  'The Marriage',
+  'Acclamation',
+  'Hymn – WC: 342 (THE voice that breath o’er Eden)',
+  'The ministry of the Word.',
+  'Old Testament Reading - Gen. 2:18-25',
+  'Psalm 128',
+  'Epistle –Ephesians 5: 21-33',
+  'Gradual Hymn- WC: 105 (GOD Give us Christian Homes)',
+  'The Gospel – Matthew 7:21- 29',
+  'Sermon',
+  'Hymn before prayers-WC: 260 (O perfect Love)',
+  'Prayers',
+  'The Peace/ Preparation',
+  'Choruses for offertory',
+  'Eucharistic Prayer',
+  'Distribution of Elements-(WC:5,14,18,72,358)',
+  'Post communion Hymn- WC: 215 (LOVE divine all love excelling)',
+  'Post Communion Sentence',
+  'Signing of Marriage Certificate and Register',
+  'Special Anthem: Women Choir & Church Choir.',
+  'Special Anthem: Cathedral Women Choir (Diocese of Idah)',
+  'Introduction of the couple and presentation of Marriage Certificate',
+  'Marriage thanksgivings',
+  'Presentation of gift by the MU/WG',
+  'Announcement',
+  'Withdrawal Hymn- WC: 360 (To God Be the Glory)',
 ];
 
 export default function ChurchWeddingProgram() {
@@ -133,19 +169,61 @@ export default function ChurchWeddingProgram() {
     <main className="min-h-screen overflow-hidden bg-cream px-4 py-16 sm:px-6 sm:py-20 lg:px-8 lg:py-24">
       <div className="mx-auto max-w-6xl">
         {/* Header */}
-        <header className="mx-auto max-w-3xl text-center">
+        <header className="mx-auto max-w-4xl text-center">
           <p className="text-[10px] font-bold uppercase tracking-[0.3em] text-emerald">
             OASIS&apos;26
           </p>
 
-          <h1 className="mt-2.5 font-[family-name:var(--font-cormorant)] text-5xl font-semibold leading-none text-wine sm:text-6xl">
-            Church Wedding
+          <p className="mt-3 text-xs font-semibold uppercase tracking-[0.18em] text-ink-soft">
+            Order of Service
+          </p>
+
+          <h1 className="mt-2 font-[family-name:var(--font-cormorant)] text-3xl font-semibold leading-tight text-wine sm:text-4xl">
+            For the Solemnization of Holy Matrimony
           </h1>
 
-          <p className="mx-auto mt-3 max-w-xl text-sm leading-5 text-ink-soft sm:text-base sm:leading-6">
-            The order of service for the solemnization of our marriage.
-          </p>
+          <div className="mx-auto mt-4 max-w-2xl">
+            <p className="font-[family-name:var(--font-cormorant)] text-2xl font-semibold leading-tight text-wine">
+              Miss Praise Cinwon Ajawo
+              <span className="mx-2 text-emerald">&amp;</span>
+              Rev&apos;d Joseph Nasara Musa
+            </p>
+
+            <p className="mt-2 text-sm leading-6 text-ink-soft sm:text-base">
+              Crowther Memorial Anglican Church, Lokoja, Kogi State
+            </p>
+
+            <p className="mt-1 text-xs font-semibold uppercase tracking-[0.18em] text-emerald">
+              Time: 10:00am
+            </p>
+          </div>
         </header>
+
+        <section className="mx-auto mt-7 max-w-5xl sm:mt-9">
+          <article className="rounded-[24px] border border-sand-dark/70 bg-white/95 p-4 shadow-sm sm:p-6">
+            <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-emerald">
+              The Marriage Service
+            </p>
+
+            <h2 className="mt-1.5 font-[family-name:var(--font-cormorant)] text-2xl font-semibold leading-tight text-wine sm:text-3xl">
+              Order of Service
+            </h2>
+
+            <div className="mt-4 grid gap-x-6 gap-y-2 sm:grid-cols-2">
+              {serviceOverview.map((item, index) => (
+                <div
+                  key={`${index}-${item}`}
+                  className="flex items-start gap-2.5 text-sm leading-5 text-ink-soft"
+                >
+                  <span className="mt-0.5 shrink-0 font-[family-name:var(--font-cormorant)] text-lg font-semibold text-wine/50">
+                    {String(index + 1).padStart(2, '0')}
+                  </span>
+                  <p>{item}</p>
+                </div>
+              ))}
+            </div>
+          </article>
+        </section>
 
         {/* Officiating Ministers */}
         <section className="mx-auto mt-9 max-w-5xl sm:mt-12">
@@ -179,8 +257,18 @@ export default function ChurchWeddingProgram() {
           </article>
         </section>
 
-        {/* Order of Service */}
-        <section className="mx-auto mt-7 max-w-5xl sm:mt-9">
+        {/* Detailed Marriage Service */}
+        <section className="mx-auto mt-8 max-w-5xl sm:mt-10">
+          <div className="mb-4 text-center">
+            <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-emerald">
+              The Marriage Service
+            </p>
+
+            <h2 className="mt-1 font-[family-name:var(--font-cormorant)] text-2xl font-semibold text-wine sm:text-3xl">
+              Detailed Order
+            </h2>
+          </div>
+
           <div className="space-y-3 sm:space-y-3.5">
             {programmeItems.map((item, index) => {
               const isOpen =
@@ -395,6 +483,9 @@ function ProgramContent({
 }: {
   item: ChurchWeddingConfig;
 }) {
+  /*
+   * Standard hymn with title + lyrics.
+   */
   if (
     item.type === 'hymn' &&
     !Array.isArray(item.content)
@@ -402,24 +493,21 @@ function ProgramContent({
     return <HymnContent content={item.content} />;
   }
 
+  /*
+   * Multiple hymns where only the hymn numbers
+   * should be displayed.
+   */
   if (
-    item.type === 'scripture' &&
-    !Array.isArray(item.content)
+    item.type === 'hymns' &&
+    !Array.isArray(item.content) &&
+    'hymns' in item.content
   ) {
-    return (
-      <ScriptureContent
-        content={toScriptureContent(item.content)}
-      />
-    );
+    return <HymnsContent content={item.content} />;
   }
 
-  if (
-    item.type === 'sermon' &&
-    !Array.isArray(item.content)
-  ) {
-    return <SermonContent content={item.content} />;
-  }
-
+  /*
+   * Prayer collection.
+   */
   if (
     item.type === 'prayers' &&
     !Array.isArray(item.content) &&
@@ -428,6 +516,9 @@ function ProgramContent({
     return <PrayerContent content={item.content} />;
   }
 
+  /*
+   * Standard content blocks.
+   */
   if (Array.isArray(item.content)) {
     return (
       <div className="space-y-3">
@@ -444,6 +535,46 @@ function ProgramContent({
   return null;
 }
 
+type HymnsContentData = {
+  instruction?: string;
+  hymns?: string[];
+};
+
+function HymnsContent({
+  content,
+}: {
+  content: HymnsContentData;
+}) {
+  const hymns = Array.isArray(content.hymns)
+    ? content.hymns
+    : [];
+
+  return (
+    <div className="space-y-4">
+      {content.instruction ? (
+        <p className="text-sm font-medium italic leading-5 text-orange-700 sm:text-[15px] sm:leading-5.5">
+          {content.instruction}
+        </p>
+      ) : null}
+
+      {hymns.length > 0 ? (
+        <div className="grid gap-2 sm:grid-cols-2">
+          {hymns.map((hymn, index) => (
+            <div
+              key={`${hymn}-${index}`}
+              className="rounded-[17px] border border-sand-dark/50 bg-cream/60 px-4 py-3"
+            >
+              <p className="font-[family-name:var(--font-cormorant)] text-2xl font-semibold leading-tight text-wine">
+                {hymn}
+              </p>
+            </div>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 function ContentBlock({
   block,
 }: {
@@ -453,7 +584,7 @@ function ContentBlock({
     case 'instruction':
       return (
         <p className="text-sm font-medium italic leading-5 text-orange-700 sm:text-[15px] sm:leading-5.5">
-          ({block.text})
+          {block.text}
         </p>
       );
 
@@ -467,14 +598,46 @@ function ContentBlock({
     case 'paragraph':
       return (
         <div className="whitespace-pre-line text-sm leading-6 text-ink-soft sm:text-[15px] sm:leading-6.5">
-          {block.text}
+          {block.segments
+            ? block.segments.map((segment, index) =>
+                segment.emphasis === 'strong' ? (
+                  <strong
+                    key={index}
+                    className="font-semibold text-wine"
+                  >
+                    {segment.text}
+                  </strong>
+                ) : (
+                  <span key={index}>{segment.text}</span>
+                ),
+              )
+            : block.text}
         </div>
       );
 
     case 'prayer':
       return (
         <div className="rounded-[17px] border border-sand-dark/50 bg-cream/65 p-3.5 text-sm leading-6 text-ink-soft sm:p-4 sm:text-[15px] sm:leading-6.5">
-          {block.text}
+          {block.label ? (
+            <p className="mb-1 text-[10px] font-bold uppercase tracking-[0.15em] text-emerald">
+              {block.label}
+            </p>
+          ) : null}
+
+          {block.segments
+            ? block.segments.map((segment, index) =>
+                segment.emphasis === 'strong' ? (
+                  <strong
+                    key={index}
+                    className="font-semibold text-wine"
+                  >
+                    {segment.text}
+                  </strong>
+                ) : (
+                  <span key={index}>{segment.text}</span>
+                ),
+              )
+            : block.text}
         </div>
       );
 
@@ -547,14 +710,16 @@ function ContentBlock({
             </h3>
           </div>
 
-          <div className="space-y-3.5">
-            {block.content.map((nestedBlock, index) => (
-              <ContentBlock
-                key={`${nestedBlock.type}-${index}`}
-                block={nestedBlock}
-              />
-            ))}
-          </div>
+          {block.content.length > 0 ? (
+            <div className="space-y-3.5">
+              {block.content.map((nestedBlock, index) => (
+                <ContentBlock
+                  key={`${nestedBlock.type}-${index}`}
+                  block={nestedBlock}
+                />
+              ))}
+            </div>
+          ) : null}
         </div>
       );
   }
@@ -629,7 +794,10 @@ function HymnContent({
 
             <div className="space-y-0.5 font-[family-name:var(--font-cormorant)] text-lg leading-6.5 text-wine sm:text-xl sm:leading-7">
               {lines.map(
-                (line: string, lineIndex: number) => (
+                (
+                  line: string,
+                  lineIndex: number,
+                ) => (
                   <p key={`${index}-${lineIndex}`}>
                     {line}
                   </p>
@@ -666,127 +834,6 @@ function HymnContent({
   );
 }
 
-type ScriptureVerseData = {
-  number: string;
-  text: string;
-};
-
-type ScriptureContentData = {
-  translation?: string;
-  heading?: string;
-  subtitle?: string;
-  sections?: Array<{
-    heading?: string;
-    verses?: ScriptureVerseData[];
-  }>;
-  verses?: ScriptureVerseData[];
-};
-
-function toScriptureContent(
-  content: Exclude<
-    ChurchWeddingConfig['content'],
-    ChurchWeddingContentBlock[]
-  >,
-): ScriptureContentData {
-  const verses: ScriptureVerseData[] | undefined = (
-    content.verses as unknown[] | undefined
-  )?.filter(
-    (verse): verse is ScriptureVerseData =>
-      !Array.isArray(verse) &&
-      typeof verse === 'object' &&
-      verse !== null &&
-      'number' in verse &&
-      typeof verse.number === 'string' &&
-      'text' in verse &&
-      typeof verse.text === 'string',
-  );
-
-  return {
-    translation: content.translation,
-    heading: content.heading,
-    subtitle: content.subtitle,
-    sections: content.sections,
-    verses,
-  };
-}
-
-function ScriptureContent({
-  content,
-}: {
-  content: ScriptureContentData;
-}) {
-  return (
-    <div className="space-y-4">
-      <div>
-        {content.translation ? (
-          <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-emerald">
-            {content.translation}
-          </p>
-        ) : null}
-
-        {content.heading ? (
-          <h3 className="mt-1 font-[family-name:var(--font-cormorant)] text-3xl font-semibold leading-tight text-wine">
-            {content.heading}
-          </h3>
-        ) : null}
-
-        {content.subtitle ? (
-          <p className="mt-0.5 text-sm italic leading-5 text-ink-soft">
-            {content.subtitle}
-          </p>
-        ) : null}
-      </div>
-
-      {content.sections?.map(
-        (section, sectionIndex) => (
-          <div
-            key={`${section.heading ?? 'section'}-${sectionIndex}`}
-            className="space-y-3"
-          >
-            {section.heading ? (
-              <h4 className="font-[family-name:var(--font-cormorant)] text-2xl font-semibold leading-tight text-wine">
-                {section.heading}
-              </h4>
-            ) : null}
-
-            {section.verses?.map((verse) => (
-              <ScriptureVerse
-                key={verse.number}
-                verse={verse}
-              />
-            ))}
-          </div>
-        ),
-      )}
-
-      {content.verses?.map((verse) => (
-        <ScriptureVerse
-          key={verse.number}
-          verse={verse}
-        />
-      ))}
-    </div>
-  );
-}
-
-function ScriptureVerse({
-  verse,
-}: {
-  verse: ScriptureVerseData;
-}) {
-  return (
-    <div className="grid grid-cols-[1.6rem_1fr] gap-2">
-      <span className="pt-0.5 font-[family-name:var(--font-cormorant)] text-lg font-semibold leading-none text-wine/50">
-        {verse.number}
-      </span>
-
-      <p className="whitespace-pre-line text-sm leading-6 text-ink-soft sm:text-[15px] sm:leading-6.5">
-        {verse.text}
-      </p>
-    </div>
-  );
-}
-
 type PrayerContentData = {
   prayers?: Array<{ text: string }>;
 };
@@ -813,237 +860,4 @@ function PrayerContent({
       )}
     </div>
   );
-}
-
-type SermonContentData = {
-  topic?: string;
-  readings?: Array<{
-    label: string;
-    reference: string;
-  }>;
-  preacher?: string;
-  openingPrayer?: {
-    title: string;
-    text: string;
-  };
-  text?: string;
-  notes?: string[];
-  closingPrayer?: {
-    title: string;
-    text: string;
-  };
-};
-
-function SermonContent({
-  content,
-}: {
-  content: SermonContentData;
-}) {
-  return (
-    <div className="space-y-4">
-      {content.topic ? (
-        <div>
-          <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-emerald">
-            Topic
-          </p>
-
-          <h3 className="mt-0.5 font-[family-name:var(--font-cormorant)] text-3xl font-semibold leading-tight text-wine sm:text-[34px]">
-            {content.topic}
-          </h3>
-        </div>
-      ) : null}
-
-      {content.readings?.length ? (
-        <div className="rounded-[17px] border border-sand-dark/50 bg-cream/60 p-3.5 sm:p-4">
-          <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-emerald">
-            Readings
-          </p>
-
-          <div className="mt-2 space-y-2">
-            {content.readings.map(
-              (
-                reading: {
-                  label: string;
-                  reference: string;
-                },
-              ) => (
-                <div key={reading.reference}>
-                  <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-wine/50">
-                    {reading.label}
-                  </p>
-
-                  <p className="mt-0.5 font-[family-name:var(--font-cormorant)] text-lg font-semibold leading-tight text-wine">
-                    {reading.reference}
-                  </p>
-                </div>
-              ),
-            )}
-          </div>
-        </div>
-      ) : null}
-
-      {content.preacher ? (
-        <div>
-          <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-emerald">
-            Preacher
-          </p>
-
-          <p className="mt-0.5 font-[family-name:var(--font-cormorant)] text-2xl font-semibold leading-tight text-wine">
-            {content.preacher}
-          </p>
-        </div>
-      ) : null}
-
-      {content.openingPrayer ? (
-        <div>
-          <h4 className="font-[family-name:var(--font-cormorant)] text-2xl font-semibold leading-tight text-wine">
-            {content.openingPrayer.title}
-          </h4>
-
-          <p className="mt-1.5 rounded-[17px] bg-cream/60 p-3.5 text-sm leading-6 text-ink-soft sm:p-4 sm:text-[15px] sm:leading-6.5">
-            {content.openingPrayer.text}
-          </p>
-        </div>
-      ) : null}
-
-      {content.text ? (
-        <div className="whitespace-pre-line text-sm leading-6.5 text-ink-soft sm:text-[15px] sm:leading-7">
-          {content.text.trim()}
-        </div>
-      ) : null}
-
-      {content.notes?.length ? (
-        <div>
-          <h4 className="font-[family-name:var(--font-cormorant)] text-2xl font-semibold leading-tight text-wine">
-            Notes
-          </h4>
-
-          <div className="mt-2 space-y-1.5">
-            {content.notes.map(
-              (note: string, index: number) => (
-                <p
-                  key={`note-${index}`}
-                  className="border-l-2 border-emerald pl-3 text-sm leading-6 text-ink-soft"
-                >
-                  {note}
-                </p>
-              ),
-            )}
-          </div>
-        </div>
-      ) : null}
-
-      {content.closingPrayer ? (
-        <div>
-          <h4 className="font-[family-name:var(--font-cormorant)] text-2xl font-semibold leading-tight text-wine">
-            {content.closingPrayer.title}
-          </h4>
-
-          <p className="mt-1.5 rounded-[17px] bg-cream/60 p-3.5 text-sm leading-6 text-ink-soft sm:p-4 sm:text-[15px] sm:leading-6.5">
-            {content.closingPrayer.text}
-          </p>
-        </div>
-      ) : null}
-    </div>
-  );
-}
-
-function buildScriptureBlocks(
-  item: { content?: unknown },
-): ChurchWeddingContentBlock[] {
-  if (!item.content || Array.isArray(item.content)) {
-    return [];
-  }
-
-  const content = item.content as {
-    translation?: string;
-    heading?: string;
-    subtitle?: string;
-    sections?: Array<{
-      heading?: string;
-      verses?: Array<{
-        number: string;
-        text: string;
-      }>;
-    }>;
-    verses?: Array<
-      | string[]
-      | {
-          lines: string[];
-          refrain?: string[];
-        }
-      | {
-          number: string;
-          text: string;
-        }
-    >;
-  };
-
-  const blocks: ChurchWeddingContentBlock[] = [];
-
-  if (content.translation) {
-    blocks.push({
-      type: 'instruction',
-      text: `Translation: ${content.translation}`,
-    });
-  }
-
-  if (content.heading) {
-    blocks.push({
-      type: 'subheading',
-      text: content.heading,
-    });
-  }
-
-  if (content.subtitle) {
-    blocks.push({
-      type: 'instruction',
-      text: content.subtitle,
-    });
-  }
-
-  if (content.sections) {
-    content.sections.forEach((section) => {
-      if (section.heading) {
-        blocks.push({
-          type: 'subheading',
-          text: section.heading,
-        });
-      }
-
-      section.verses?.forEach((verse) => {
-        blocks.push({
-          type: 'scripture',
-          reference: `Verse ${verse.number}`,
-          text: verse.text,
-        });
-      });
-    });
-  }
-
-  if (content.verses) {
-    content.verses.forEach((verse) => {
-      if (Array.isArray(verse)) {
-        blocks.push({
-          type: 'scripture',
-          reference: 'Verse',
-          text: verse.join('\n'),
-        });
-      } else if ('lines' in verse) {
-        blocks.push({
-          type: 'scripture',
-          reference: 'Verse',
-          text: verse.lines.join('\n'),
-        });
-      } else {
-        blocks.push({
-          type: 'scripture',
-          reference: `Verse ${verse.number}`,
-          text: verse.text,
-        });
-      }
-    });
-  }
-
-  return blocks;
 }

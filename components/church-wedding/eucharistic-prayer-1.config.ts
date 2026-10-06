@@ -13,7 +13,17 @@ export const eucharisticPrayer1 = {
   content: [
     {
       type: 'instruction' as const,
-      text: 'Congregation remains standing.',
+      text: '17. THE EUCHARISTIC PRAYERS:',
+    },
+
+    {
+      type: 'subheading' as const,
+      text: 'EUCHARISTIC PRAYER 1',
+    },
+
+    {
+      type: 'instruction' as const,
+      text: '(Congregation remains standing)',
     },
 
     {

@@ -6,13 +6,13 @@ export const communionHymns = {
   title: 'Communion Hymns',
 
   description:
-    'Solemn lyrics or hymns may be sung during the distribution of Holy Communion.',
+    'Hymns that may be sung during the distribution of Holy Communion.',
 
   type: 'hymns' as const,
 
   content: {
     instruction:
-      'During the distribution solemn lyrics or hymns may be sung.',
+      'During the distribution of Holy Communion, the following hymns may be sung.',
 
     hymns: [
       'WC: 5',

@@ -12,8 +12,13 @@ export const preparation = {
 
   content: [
     {
+      type: 'instruction' as const,
+      text: 'The Eucharist continues with the PEACE and where there is no Eucharist, thanksgiving and offering can be taken here.',
+    },
+
+    {
       type: 'subheading' as const,
-      text: 'The Peace',
+      text: 'THE PEACE',
     },
 
     {
@@ -47,17 +52,17 @@ export const preparation = {
 
     {
       type: 'subheading' as const,
-      text: 'The Preparation of the Gifts',
-    },
-
-    {
-      type: 'instruction' as const,
-      text: 'Choruses to be led by the Choir for offertory.',
+      text: 'THE PREPARATION OF THE GIFTS',
     },
 
     {
       type: 'subheading' as const,
-      text: 'Ceremonial Washing of Hands',
+      text: '15. Choruses to be led by the Choir for offertory.',
+    },
+
+    {
+      type: 'subheading' as const,
+      text: '16. Ceremonial washing of hands may take place here.',
     },
 
     {

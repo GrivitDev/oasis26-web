@@ -8,7 +8,7 @@ export const introduction = {
   description:
     'The congregation remains standing as the bride and bridegroom stand before the Priest and the Priest introduces the marriage and its Christian meaning.',
 
-  type: 'scripture' as const,
+  type: 'ceremony' as const,
 
   content: [
     {

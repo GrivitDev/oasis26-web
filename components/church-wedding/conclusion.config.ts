@@ -5,8 +5,7 @@ export const conclusion = {
 
   title: 'Conclusion',
 
-  description:
-    'The closing proceedings of the marriage service, including the signing of the marriage certificate and register, special anthems, thanksgiving, presentation, announcements, dismissal, benediction, and the Hallelujah Chorus.',
+  description: 'The closing items of the marriage service.',
 
   type: 'conclusion' as const,
 
@@ -15,105 +14,61 @@ export const conclusion = {
       type: 'subsection' as const,
       number: '26',
       title: 'Signing of Marriage Certificate and Register',
-
-      content: [
-        {
-          type: 'instruction' as const,
-          text: 'The Marriage Certificate and Register are signed.',
-        },
-      ],
+      content: [],
     },
 
     {
       type: 'subsection' as const,
       number: '27',
-      title: 'Special Anthem — Women Choir & Church Choir',
-
-      content: [
-        {
-          type: 'instruction' as const,
-          text: 'Special Anthem: Women Choir & Church Choir.',
-        },
-      ],
+      title: 'Special Anthem: Women Choir & Church Choir.',
+      content: [],
     },
 
     {
       type: 'subsection' as const,
       number: '28',
-      title: 'Special Anthem — Cathedral Women Choir',
-
-      content: [
-        {
-          type: 'instruction' as const,
-          text: 'Special Anthem: Cathedral Women Choir (Diocese of Idah).',
-        },
-      ],
+      title: 'Special Anthem: Cathedral Women Choir (Diocese of Idah)',
+      content: [],
     },
 
     {
       type: 'subsection' as const,
       number: '29',
-      title: 'Introduction of the Couple and Presentation of Marriage Certificate',
-
-      content: [
-        {
-          type: 'instruction' as const,
-          text: 'The couple is introduced and the Marriage Certificate is presented.',
-        },
-      ],
+      title: 'Introduction of the couple and presentation of Marriage Certificate',
+      content: [],
     },
 
     {
       type: 'subsection' as const,
       number: '30',
-      title: 'Marriage Thanksgivings',
-
-      content: [
-        {
-          type: 'instruction' as const,
-          text: 'Marriage thanksgivings are offered.',
-        },
-      ],
+      title: 'Marriage thanksgivings',
+      content: [],
     },
 
     {
       type: 'subsection' as const,
       number: '31',
-      title: 'Presentation of Gift by the MU/WG',
-
-      content: [
-        {
-          type: 'instruction' as const,
-          text: 'Presentation of gift by the MU/WG.',
-        },
-      ],
+      title: 'Presentation of gift by the MU/WG',
+      content: [],
     },
 
     {
       type: 'subsection' as const,
       number: '32',
       title: 'Announcement',
-
-      content: [
-        {
-          type: 'instruction' as const,
-          text: 'Announcements are made.',
-        },
-      ],
+      content: [],
     },
 
     {
       type: 'subsection' as const,
       number: '33',
       title: 'Dismissal',
-
       content: [
         {
           type: 'dialogue' as const,
           speaker: 'President',
           text: 'Go in peace to love and serve the Lord.',
         },
-
         {
           type: 'dialogue' as const,
           speaker: 'All',
@@ -126,7 +81,6 @@ export const conclusion = {
       type: 'subsection' as const,
       number: '34',
       title: 'Prayer & Benediction',
-
       content: [
         {
           type: 'prayer' as const,
@@ -139,13 +93,7 @@ export const conclusion = {
       type: 'subsection' as const,
       number: '35',
       title: 'Hallelujah Chorus',
-
-      content: [
-        {
-          type: 'instruction' as const,
-          text: 'Hallelujah Chorus.',
-        },
-      ],
+      content: [],
     },
   ],
 

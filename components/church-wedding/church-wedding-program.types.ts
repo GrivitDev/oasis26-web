@@ -1,5 +1,10 @@
 // src/components/church-wedding/church-wedding-program.types.ts
 
+export type ChurchWeddingTextSegment = {
+  text: string;
+  emphasis?: 'strong';
+};
+
 export type ChurchWeddingContentBlock =
   | {
       type: 'instruction';
@@ -7,7 +12,9 @@ export type ChurchWeddingContentBlock =
     }
   | {
       type: 'paragraph' | 'prayer';
-      text: string;
+      text?: string;
+      label?: string;
+      segments?: ChurchWeddingTextSegment[];
     }
   | {
       type: 'question';

@@ -44,6 +44,8 @@ export interface GalleryItemResponse {
   createdAt: string;
 }
 
+export const MAX_SELECTION_COUNT = 25;
+export const GALLERY_PAGE_SIZE = 48;
 export const MAX_IMAGE_SIZE = 10 * 1024 * 1024;
 export const MAX_VIDEO_SIZE = 90 * 1024 * 1024;
 
@@ -61,6 +63,35 @@ export const ALLOWED_VIDEO_TYPES = new Set([
   'video/quicktime',
 ]);
 
+export function validateGalleryUploadFile(
+  file: Pick<File, 'type' | 'size'>,
+  section: GallerySection,
+): string | null {
+  const isVideo = file.type.startsWith('video/');
+
+  if (section === GALLERY_SECTIONS.PRE_WEDDING && isVideo) {
+    return 'Videos are not allowed in the pre-wedding gallery.';
+  }
+
+  if (isVideo && !ALLOWED_VIDEO_TYPES.has(file.type)) {
+    return 'Please select an MP4, WebM, or MOV video.';
+  }
+
+  if (!isVideo && !ALLOWED_IMAGE_TYPES.has(file.type)) {
+    return 'Please select a JPEG, PNG, WebP, HEIC, or HEIF image.';
+  }
+
+  const maxSize = isVideo ? MAX_VIDEO_SIZE : MAX_IMAGE_SIZE;
+
+  if (file.size > maxSize) {
+    return isVideo
+      ? 'This video is too large. The maximum video size is 90 MB.'
+      : 'This image is too large. The maximum image size is 10 MB.';
+  }
+
+  return null;
+}
+
 export function toGalleryItemResponse(
   item: GalleryItemDocument,
 ): GalleryItemResponse {
@@ -74,7 +105,10 @@ export function toGalleryItemResponse(
     width: item.width,
     height: item.height,
     duration: item.duration,
-    likes: item.likes,
-    createdAt: item.createdAt.toISOString(),
+    likes: Number(item.likes ?? 0),
+    createdAt:
+      item.createdAt instanceof Date
+        ? item.createdAt.toISOString()
+        : new Date(item.createdAt).toISOString(),
   };
 }

@@ -1,11 +1,12 @@
-// src/app/api/gallery/upload/route.ts
+import crypto from 'crypto';
 
 import { NextRequest, NextResponse } from 'next/server';
-import crypto from 'crypto';
 
 import clientPromise from '@/lib/mongodb';
 import cloudinary from '@/lib/cloudinary';
 import {
+  ALLOWED_IMAGE_TYPES,
+  ALLOWED_VIDEO_TYPES,
   GALLERY_MEDIA_TYPES,
   GALLERY_SECTIONS,
   MAX_IMAGE_SIZE,
@@ -14,19 +15,15 @@ import {
   type GalleryMediaType,
   type GallerySection,
 } from '@/lib/gallery';
+import { ensureGalleryIndexes } from '@/lib/gallery-server';
 
 export const runtime = 'nodejs';
 
-const CLOUDINARY_FOLDER_PREFIX =
-  'oasis26/gallery';
+const CLOUDINARY_FOLDER_PREFIX = 'oasis26/gallery';
 
-/* ============================================================= */
-/* VALIDATION                                                     */
-/* ============================================================= */
+type JsonObject = Record<string, unknown>;
 
-function isValidSection(
-  value: unknown,
-): value is GallerySection {
+function isValidSection(value: unknown): value is GallerySection {
   return (
     value === GALLERY_SECTIONS.PRE_WEDDING ||
     value === GALLERY_SECTIONS.LIVE
@@ -42,177 +39,139 @@ function isValidResourceType(
   );
 }
 
-function getGalleryFolder(
-  section: GallerySection,
-): string {
+function getGalleryFolder(section: GallerySection): string {
   return `${CLOUDINARY_FOLDER_PREFIX}/${section}`;
 }
 
 function getMaxSizeForResourceType(
   resourceType: GalleryMediaType,
 ): number {
-  return resourceType ===
-    GALLERY_MEDIA_TYPES.IMAGE
+  return resourceType === GALLERY_MEDIA_TYPES.IMAGE
     ? MAX_IMAGE_SIZE
     : MAX_VIDEO_SIZE;
 }
 
-function formatMegabytes(
-  bytes: number,
-): string {
-  return `${Math.round(
-    bytes / 1024 / 1024,
-  )} MB`;
+function formatMegabytes(bytes: number): string {
+  return `${Math.round(bytes / 1024 / 1024)} MB`;
 }
-
-/* ============================================================= */
-/* CLOUDINARY ASSET VALIDATION                                    */
-/* ============================================================= */
 
 function isGalleryPublicId(
   publicId: string,
   section: GallerySection,
 ): boolean {
-  const expectedPrefix =
-    `${getGalleryFolder(section)}/`;
-
-  return publicId.startsWith(
-    expectedPrefix,
-  );
+  const expectedPrefix = `${getGalleryFolder(section)}/`;
+  return publicId.startsWith(expectedPrefix) && !publicId.includes('..');
 }
 
-function isAllowedImageFormat(
-  format: unknown,
-): boolean {
-  if (
-    typeof format !== 'string'
-  ) {
+function isAllowedImageFormat(format: unknown): boolean {
+  if (typeof format !== 'string') {
     return false;
   }
 
-  return new Set([
-    'jpg',
-    'jpeg',
-    'png',
-    'webp',
-    'heic',
-    'heif',
-  ]).has(
-    format.toLowerCase(),
-  );
+  return ALLOWED_IMAGE_TYPES.has(`image/${format.toLowerCase()}`);
 }
 
-function isAllowedVideoFormat(
-  format: unknown,
-): boolean {
-  if (
-    typeof format !== 'string'
-  ) {
+function isAllowedVideoFormat(format: unknown): boolean {
+  if (typeof format !== 'string') {
     return false;
   }
 
-  return new Set([
-    'mp4',
-    'webm',
-    'mov',
-  ]).has(
-    format.toLowerCase(),
+  const normalized = format.toLowerCase();
+  return (
+    normalized === 'mp4' ||
+    normalized === 'webm' ||
+    normalized === 'mov'
   );
 }
 
-/* ============================================================= */
-/* CLOUDINARY API SECRET                                          */
-/* ============================================================= */
+function getApiSecret(): string {
+  const value = process.env.CLOUDINARY_API_SECRET;
+  if (!value) {
+    throw new Error('Missing CLOUDINARY_API_SECRET.');
+  }
+  return value;
+}
 
-function getCloudinaryApiSecret(): string {
-  const apiSecret =
-    process.env.CLOUDINARY_API_SECRET;
+function timingSafeEqualString(
+  supplied: string,
+  expected: string,
+): boolean {
+  const suppliedBuffer = Buffer.from(supplied);
+  const expectedBuffer = Buffer.from(expected);
 
-  if (!apiSecret) {
-    throw new Error(
-      'Missing CLOUDINARY_API_SECRET.',
+  if (suppliedBuffer.length !== expectedBuffer.length) {
+    return false;
+  }
+
+  return crypto.timingSafeEqual(
+    suppliedBuffer,
+    expectedBuffer,
+  );
+}
+
+function authorizePreWeddingUpload(
+  section: GallerySection,
+  uploadToken: unknown,
+): NextResponse | null {
+  if (section !== GALLERY_SECTIONS.PRE_WEDDING) {
+    return null;
+  }
+
+  const expectedToken = process.env.PREWEDDING_UPLOAD_TOKEN?.trim();
+
+  if (!expectedToken) {
+    return NextResponse.json(
+      { error: 'Pre-wedding uploads are not configured.' },
+      { status: 503 },
     );
   }
 
-  return apiSecret;
+  if (
+    typeof uploadToken !== 'string' ||
+    !timingSafeEqualString(uploadToken.trim(), expectedToken)
+  ) {
+    return NextResponse.json(
+      { error: 'Invalid pre-wedding upload token.' },
+      { status: 403 },
+    );
+  }
+
+  return null;
 }
 
-/* ============================================================= */
-/* UPLOAD SIGNATURE                                               */
-/* ============================================================= */
-
-type UploadSignatureResponse = {
+function createUploadSignature(
+  section: GallerySection,
+  resourceType: GalleryMediaType,
+): {
   cloudName: string;
   apiKey: string;
   timestamp: number;
   signature: string;
   folder: string;
   publicId: string;
-  resourceType:
-    | 'image'
-    | 'video';
-};
+  resourceType: GalleryMediaType;
+} {
+  const cloudName = process.env.CLOUDINARY_CLOUD_NAME;
+  const apiKey = process.env.CLOUDINARY_API_KEY;
+  const apiSecret = getApiSecret();
 
-async function createUploadSignature(
-  section: GallerySection,
-  resourceType: GalleryMediaType,
-): Promise<UploadSignatureResponse> {
-  const cloudName =
-    process.env.CLOUDINARY_CLOUD_NAME;
-
-  const apiKey =
-    process.env.CLOUDINARY_API_KEY;
-
-  const apiSecret =
-    getCloudinaryApiSecret();
-
-  if (
-    !cloudName ||
-    !apiKey
-  ) {
-    throw new Error(
-      'Missing Cloudinary environment variables.',
-    );
+  if (!cloudName || !apiKey) {
+    throw new Error('Missing Cloudinary environment variables.');
   }
 
-  const timestamp =
-    Math.floor(
-      Date.now() / 1000,
-    );
+  const timestamp = Math.floor(Date.now() / 1000);
+  const folder = getGalleryFolder(section);
+  const randomId = crypto.randomBytes(16).toString('hex');
+  const publicId = `${folder}/${Date.now()}-${randomId}`;
 
-  const folder =
-    getGalleryFolder(section);
-
-  /*
-   * Generate the Cloudinary public ID on the
-   * server so the browser cannot choose an
-   * arbitrary gallery asset path.
-   */
-  const randomId =
-    crypto.randomBytes(16).toString(
-      'hex',
-    );
-
-  const publicId =
-    `${folder}/${Date.now()}-${randomId}`;
-
-  /*
-   * These parameters are signed.
-   *
-   * The browser must send exactly the same
-   * values to Cloudinary.
-   */
-  const signatureParams = {
-    folder,
-    public_id: publicId,
-    timestamp,
-  };
-
-  const signature =
-    cloudinary.utils.api_sign_request(
-      signatureParams,
-      apiSecret,
-    );
+  const signature = cloudinary.utils.api_sign_request(
+    {
+      folder,
+      public_id: publicId,
+      timestamp,
+    },
+    apiSecret,
+  );
 
   return {
     cloudName,
@@ -225,292 +184,133 @@ async function createUploadSignature(
   };
 }
 
-/* ============================================================= */
-/* POST                                                            */
-/* ============================================================= */
+function errorResponse(message: string, status = 400) {
+  return NextResponse.json({ error: message }, { status });
+}
 
-export async function POST(
-  request: NextRequest,
-) {
+export async function POST(request: NextRequest) {
   try {
-    const body =
-      await request.json();
-
-    const action =
-      body?.action;
-
-    /* ========================================================= */
-    /* SIGN                                                        */
-    /* ========================================================= */
+    const body = (await request.json()) as JsonObject;
+    const action = body.action;
 
     if (action === 'sign') {
-      const section =
-        body?.section;
+      const section = body.section;
+      const resourceType = body.resourceType;
+      const uploadToken = body.uploadToken;
 
-      const resourceType =
-        body?.resourceType;
+      if (!isValidSection(section)) {
+        return errorResponse('Invalid gallery section.');
+      }
 
-      if (
-        !isValidSection(section)
-      ) {
-        return NextResponse.json(
-          {
-            error:
-              'Invalid gallery section.',
-          },
-          { status: 400 },
-        );
+      if (!isValidResourceType(resourceType)) {
+        return errorResponse('Invalid media type.');
       }
 
       if (
-        !isValidResourceType(
-          resourceType,
-        )
+        section === GALLERY_SECTIONS.PRE_WEDDING &&
+        resourceType === GALLERY_MEDIA_TYPES.VIDEO
       ) {
-        return NextResponse.json(
-          {
-            error:
-              'Invalid media type.',
-          },
-          { status: 400 },
+        return errorResponse(
+          'Videos are not allowed in the pre-wedding gallery.',
         );
       }
 
-      /*
-       * Pre-wedding gallery accepts photographs
-       * only.
-       *
-       * No token or password is required.
-       */
-      if (
-        section ===
-          GALLERY_SECTIONS.PRE_WEDDING &&
-        resourceType ===
-          GALLERY_MEDIA_TYPES.VIDEO
-      ) {
-        return NextResponse.json(
-          {
-            error:
-              'Videos are not allowed in the pre-wedding gallery.',
-          },
-          { status: 400 },
-        );
-      }
-
-      const signature =
-        await createUploadSignature(
-          section,
-          resourceType,
-        );
-
-      return NextResponse.json(
-        signature,
+      const authorizationError = authorizePreWeddingUpload(
+        section,
+        uploadToken,
       );
+
+      if (authorizationError) {
+        return authorizationError;
+      }
+
+      const signature = createUploadSignature(
+        section,
+        resourceType,
+      );
+
+      return NextResponse.json(signature, {
+        headers: {
+          'Cache-Control': 'no-store',
+        },
+      });
     }
 
-    /* ========================================================= */
-    /* COMPLETE                                                     */
-    /* ========================================================= */
-
     if (action === 'complete') {
-      const section =
-        body?.section;
+      const section = body.section;
+      const publicId = body.publicId;
+      const resourceType = body.resourceType;
+      const originalFilename = body.originalFilename;
+      const uploadToken = body.uploadToken;
 
-      const publicId =
-        body?.publicId;
+      if (!isValidSection(section)) {
+        return errorResponse('Invalid gallery section.');
+      }
 
-      const secureUrl =
-        body?.secureUrl;
+      if (!isValidResourceType(resourceType)) {
+        return errorResponse('Invalid media type.');
+      }
 
-      const resourceType =
-        body?.resourceType;
+      if (typeof publicId !== 'string' || !publicId.trim()) {
+        return errorResponse('Invalid Cloudinary public ID.');
+      }
 
-      const originalFilename =
-        body?.originalFilename;
-
-      const width =
-        body?.width;
-
-      const height =
-        body?.height;
-
-      const duration =
-        body?.duration;
-
-      if (
-        !isValidSection(section)
-      ) {
-        return NextResponse.json(
-          {
-            error:
-              'Invalid gallery section.',
-          },
-          { status: 400 },
-        );
+      if (!isGalleryPublicId(publicId, section)) {
+        return errorResponse('Invalid Cloudinary gallery asset.');
       }
 
       if (
-        !isValidResourceType(
-          resourceType,
-        )
-      ) {
-        return NextResponse.json(
-          {
-            error:
-              'Invalid media type.',
-          },
-          { status: 400 },
-        );
-      }
-
-      if (
-        typeof publicId !==
-        'string'
-      ) {
-        return NextResponse.json(
-          {
-            error:
-              'Invalid Cloudinary public ID.',
-          },
-          { status: 400 },
-        );
-      }
-
-      if (
-        typeof secureUrl !==
-        'string'
-      ) {
-        return NextResponse.json(
-          {
-            error:
-              'Invalid Cloudinary secure URL.',
-          },
-          { status: 400 },
-        );
-      }
-
-      if (
-        typeof originalFilename !==
-          'string' ||
+        typeof originalFilename !== 'string' ||
         !originalFilename.trim()
       ) {
-        return NextResponse.json(
-          {
-            error:
-              'Original filename is required.',
-          },
-          { status: 400 },
-        );
+        return errorResponse('Original filename is required.');
       }
 
-      /*
-       * Confirm the public ID belongs to the
-       * expected gallery section.
-       */
       if (
-        !isGalleryPublicId(
-          publicId,
-          section,
-        )
+        section === GALLERY_SECTIONS.PRE_WEDDING &&
+        resourceType === GALLERY_MEDIA_TYPES.VIDEO
       ) {
-        return NextResponse.json(
-          {
-            error:
-              'Invalid Cloudinary gallery asset.',
-          },
-          { status: 400 },
+        return errorResponse(
+          'Videos are not allowed in the pre-wedding gallery.',
         );
       }
 
-      /*
-       * Pre-wedding remains photograph-only.
-       */
+      const authorizationError = authorizePreWeddingUpload(
+        section,
+        uploadToken,
+      );
+
+      if (authorizationError) {
+        return authorizationError;
+      }
+
+      const resource = (await cloudinary.api.resource(publicId, {
+        resource_type: resourceType,
+      })) as Record<string, unknown>;
+
+      const verifiedPublicId = resource.public_id;
+      const verifiedResourceType = resource.resource_type;
+
       if (
-        section ===
-          GALLERY_SECTIONS.PRE_WEDDING &&
-        resourceType ===
-          GALLERY_MEDIA_TYPES.VIDEO
+        verifiedPublicId !== publicId ||
+        verifiedResourceType !== resourceType
       ) {
-        return NextResponse.json(
-          {
-            error:
-              'Videos are not allowed in the pre-wedding gallery.',
-          },
-          { status: 400 },
-        );
-      }
-
-      /* ======================================================= */
-      /* VERIFY CLOUDINARY ASSET                                  */
-      /* ======================================================= */
-
-      let resource:
-        | Record<string, unknown>;
-
-      try {
-        resource =
-          await cloudinary.api.resource(
-            publicId,
-            {
-              resource_type:
-                resourceType,
-            },
-          );
-      } catch (error) {
-        console.error(
-          'Cloudinary asset verification error:',
-          error,
-        );
-
-        return NextResponse.json(
-          {
-            error:
-              'The uploaded file could not be verified on Cloudinary.',
-          },
-          { status: 400 },
-        );
+        return errorResponse('The uploaded asset could not be verified.');
       }
 
       const verifiedBytes =
-        typeof resource.bytes ===
-        'number'
-          ? resource.bytes
-          : 0;
+        typeof resource.bytes === 'number' ? resource.bytes : 0;
+      const maxSize = getMaxSizeForResourceType(resourceType);
 
-      const maxSize =
-        getMaxSizeForResourceType(
-          resourceType,
-        );
-
-      if (
-        verifiedBytes <= 0
-      ) {
-        return NextResponse.json(
-          {
-            error:
-              'Cloudinary returned an invalid file size.',
-          },
-          { status: 400 },
-        );
+      if (verifiedBytes <= 0) {
+        return errorResponse('Cloudinary returned an invalid file size.');
       }
 
-      if (
-        verifiedBytes >
-        maxSize
-      ) {
-        /*
-         * Delete the oversized asset so
-         * rejected uploads do not remain in
-         * Cloudinary.
-         */
+      if (verifiedBytes > maxSize) {
         try {
-          await cloudinary.uploader.destroy(
-            publicId,
-            {
-              resource_type:
-                resourceType,
-            },
-          );
+          await cloudinary.uploader.destroy(publicId, {
+            resource_type: resourceType,
+          });
         } catch (deleteError) {
           console.error(
             'Unable to remove rejected Cloudinary asset:',
@@ -518,208 +318,148 @@ export async function POST(
           );
         }
 
-        return NextResponse.json(
-          {
-            error:
-              `File exceeds the ${formatMegabytes(maxSize)} limit.`,
-          },
-          { status: 400 },
+        return errorResponse(
+          `File exceeds the ${formatMegabytes(maxSize)} limit.`,
         );
       }
 
       const verifiedFormat =
-        typeof resource.format ===
-        'string'
+        typeof resource.format === 'string'
           ? resource.format.toLowerCase()
           : '';
 
       if (
-        resourceType ===
-        GALLERY_MEDIA_TYPES.IMAGE
+        resourceType === GALLERY_MEDIA_TYPES.IMAGE &&
+        !isAllowedImageFormat(verifiedFormat)
       ) {
-        if (
-          !isAllowedImageFormat(
-            verifiedFormat,
-          )
-        ) {
-          try {
-            await cloudinary.uploader.destroy(
-              publicId,
-              {
-                resource_type:
-                  resourceType,
-              },
-            );
-          } catch (deleteError) {
-            console.error(
-              'Unable to remove rejected Cloudinary image:',
-              deleteError,
-            );
-          }
-
-          return NextResponse.json(
-            {
-              error:
-                'Unsupported image format.',
-            },
-            { status: 400 },
+        try {
+          await cloudinary.uploader.destroy(publicId, {
+            resource_type: resourceType,
+          });
+        } catch (deleteError) {
+          console.error(
+            'Unable to remove rejected Cloudinary image:',
+            deleteError,
           );
         }
+
+        return errorResponse('Unsupported image format.');
       }
 
       if (
-        resourceType ===
-        GALLERY_MEDIA_TYPES.VIDEO
+        resourceType === GALLERY_MEDIA_TYPES.VIDEO &&
+        !isAllowedVideoFormat(verifiedFormat)
       ) {
-        if (
-          !isAllowedVideoFormat(
-            verifiedFormat,
-          )
-        ) {
-          try {
-            await cloudinary.uploader.destroy(
-              publicId,
-              {
-                resource_type:
-                  resourceType,
-              },
-            );
-          } catch (deleteError) {
-            console.error(
-              'Unable to remove rejected Cloudinary video:',
-              deleteError,
-            );
-          }
-
-          return NextResponse.json(
-            {
-              error:
-                'Unsupported video format.',
-            },
-            { status: 400 },
+        try {
+          await cloudinary.uploader.destroy(publicId, {
+            resource_type: resourceType,
+          });
+        } catch (deleteError) {
+          console.error(
+            'Unable to remove rejected Cloudinary video:',
+            deleteError,
           );
         }
+
+        return errorResponse('Unsupported video format.');
       }
 
-      /* ======================================================= */
-      /* MONGODB                                                   */
-      /* ======================================================= */
+      const client = await clientPromise;
+      const db = client.db(process.env.MONGODB_DB);
+      await ensureGalleryIndexes(db);
 
-      const client =
-        await clientPromise;
-
-      const db =
-        client.db(
-          process.env.MONGODB_DB,
-        );
-
-      /*
-       * Prevent duplicate database records if
-       * the completion request is repeated.
-       */
-      const existing =
-        await db
-          .collection('gallery')
-          .findOne({
-            publicId,
-          });
+      const existing = await db.collection('gallery').findOne({
+        publicId,
+      });
 
       if (existing) {
         return NextResponse.json({
-          item:
-            toGalleryItemResponse(
-              existing as never,
-            ),
+          item: toGalleryItemResponse(existing as never),
         });
       }
 
-      /*
-       * Save the original Cloudinary secure URL
-       * exactly as returned by Cloudinary.
-       *
-       * No branding or transformation is applied.
-       */
+      const verifiedSecureUrl =
+        typeof resource.secure_url === 'string' &&
+        resource.secure_url.length > 0
+          ? resource.secure_url
+          : cloudinary.url(publicId, {
+              secure: true,
+              resource_type: resourceType,
+            });
+
       const document = {
         publicId,
-        secureUrl,
+        secureUrl: verifiedSecureUrl,
         resourceType,
         section,
-        originalFilename:
-          originalFilename.trim(),
+        originalFilename: originalFilename.trim().slice(0, 255),
         width:
-          typeof resource.width ===
-          'number'
+          typeof resource.width === 'number'
             ? resource.width
-            : typeof width ===
-                'number'
-              ? width
+            : typeof body.width === 'number'
+              ? body.width
               : undefined,
         height:
-          typeof resource.height ===
-          'number'
+          typeof resource.height === 'number'
             ? resource.height
-            : typeof height ===
-                'number'
-              ? height
+            : typeof body.height === 'number'
+              ? body.height
               : undefined,
         duration:
-          typeof resource.duration ===
-          'number'
+          typeof resource.duration === 'number'
             ? resource.duration
-            : typeof duration ===
-                'number'
-              ? duration
+            : typeof body.duration === 'number'
+              ? body.duration
               : undefined,
         likes: 0,
         createdAt: new Date(),
       };
 
-      const result =
-        await db
+      try {
+        const result = await db
           .collection('gallery')
-          .insertOne(
-            document,
-          );
+          .insertOne(document);
 
-      const savedDocument = {
-        ...document,
-        _id:
-          result.insertedId,
-      };
+        return NextResponse.json(
+          {
+            item: toGalleryItemResponse({
+              ...document,
+              _id: result.insertedId,
+            } as never),
+          },
+          { status: 201 },
+        );
+      } catch (insertError) {
+        const isDuplicate =
+          typeof insertError === 'object' &&
+          insertError !== null &&
+          'code' in insertError &&
+          insertError.code === 11000;
 
-      return NextResponse.json(
-        {
-          item:
-            toGalleryItemResponse(
-              savedDocument as never,
-            ),
-        },
-        { status: 201 },
-      );
+        if (isDuplicate) {
+          const concurrentItem = await db
+            .collection('gallery')
+            .findOne({ publicId });
+
+          if (concurrentItem) {
+            return NextResponse.json({
+              item: toGalleryItemResponse(
+                concurrentItem as never,
+              ),
+            });
+          }
+        }
+
+        throw insertError;
+      }
     }
 
-    /* ========================================================= */
-    /* INVALID ACTION                                              */
-    /* ========================================================= */
-
-    return NextResponse.json(
-      {
-        error:
-          'Invalid upload action.',
-      },
-      { status: 400 },
-    );
+    return errorResponse('Invalid upload action.');
   } catch (error) {
-    console.error(
-      'Gallery upload API error:',
-      error,
-    );
+    console.error('Gallery upload API error:', error);
 
     return NextResponse.json(
-      {
-        error:
-          'Unable to process gallery upload.',
-      },
+      { error: 'Unable to process gallery upload.' },
       { status: 500 },
     );
   }
