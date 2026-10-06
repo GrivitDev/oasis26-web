@@ -66,10 +66,7 @@ export default function GalleryPage() {
 }
 
 function GalleryPageContent() {
-  const router = useRouter();
   const searchParams = useSearchParams();
-
-  const { startUpload } = useGalleryUpload();
 
   const sectionParam =
     searchParams.get('section');
@@ -78,6 +75,22 @@ function GalleryPageContent() {
     sectionParam === 'pre-wedding'
       ? 'pre-wedding'
       : 'live';
+
+  return (
+    <GallerySectionContent
+      key={section}
+      section={section}
+    />
+  );
+}
+
+function GallerySectionContent({
+  section,
+}: {
+  section: GallerySection;
+}) {
+  const router = useRouter();
+  const { startUpload } = useGalleryUpload();
 
   const [cameraOpen, setCameraOpen] =
     useState(false);
@@ -111,11 +124,6 @@ function GalleryPageContent() {
       );
     };
   }, []);
-
-  useEffect(() => {
-    setLikeOverrides({});
-    setViewerItem(null);
-  }, [section]);
 
   useEffect(() => {
     function handleUploadComplete(
@@ -159,14 +167,6 @@ function GalleryPageContent() {
     section,
     router,
   ]);
-
-  function refreshPage() {
-    router.refresh();
-
-    setRefreshKey(
-      (current) => current + 1,
-    );
-  }
 
   const galleryTitle =
     section === 'pre-wedding'

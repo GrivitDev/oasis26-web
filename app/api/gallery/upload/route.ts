@@ -6,7 +6,6 @@ import clientPromise from '@/lib/mongodb';
 import cloudinary from '@/lib/cloudinary';
 import {
   ALLOWED_IMAGE_TYPES,
-  ALLOWED_VIDEO_TYPES,
   GALLERY_MEDIA_TYPES,
   GALLERY_SECTIONS,
   MAX_IMAGE_SIZE,
@@ -162,7 +161,7 @@ function createUploadSignature(
   const timestamp = Math.floor(Date.now() / 1000);
   const folder = getGalleryFolder(section);
   const randomId = crypto.randomBytes(16).toString('hex');
-  const publicId = `${folder}/${Date.now()}-${randomId}`;
+  const publicId = `${Date.now()}-${randomId}`;
 
   const signature = cloudinary.utils.api_sign_request(
     {
@@ -295,6 +294,14 @@ export async function POST(request: NextRequest) {
         verifiedPublicId !== publicId ||
         verifiedResourceType !== resourceType
       ) {
+        console.error('Gallery asset verification mismatch.', {
+          requestedPublicId: publicId,
+          verifiedPublicId,
+          resourceType,
+          verifiedResourceType,
+          section,
+        });
+
         return errorResponse('The uploaded asset could not be verified.');
       }
 
