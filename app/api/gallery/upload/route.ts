@@ -1,3 +1,4 @@
+```typescript
 import crypto from 'crypto';
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -54,12 +55,36 @@ function formatMegabytes(bytes: number): string {
   return `${Math.round(bytes / 1024 / 1024)} MB`;
 }
 
-function isGalleryPublicId(
-  publicId: string,
+function isValidCloudinaryResource(
+  resource: Record<string, unknown>,
   section: GallerySection,
 ): boolean {
-  const expectedPrefix = `${getGalleryFolder(section)}/`;
-  return publicId.startsWith(expectedPrefix) && !publicId.includes('..');
+  const publicId =
+    typeof resource.public_id === 'string'
+      ? resource.public_id
+      : '';
+
+  if (!publicId || publicId.includes('..')) {
+    return false;
+  }
+
+  const expectedFolder = getGalleryFolder(section);
+
+  const assetFolder =
+    typeof resource.asset_folder === 'string'
+      ? resource.asset_folder
+      : '';
+
+  const legacyFolder =
+    typeof resource.folder === 'string'
+      ? resource.folder
+      : '';
+
+  return (
+    assetFolder === expectedFolder ||
+    legacyFolder === expectedFolder ||
+    publicId.startsWith(`${expectedFolder}/`)
+  );
 }
 
 function isAllowedImageFormat(format: unknown): boolean {
@@ -147,7 +172,6 @@ function createUploadSignature(
   timestamp: number;
   signature: string;
   folder: string;
-  publicId: string;
   resourceType: GalleryMediaType;
 } {
   const cloudName = process.env.CLOUDINARY_CLOUD_NAME;
@@ -160,13 +184,12 @@ function createUploadSignature(
 
   const timestamp = Math.floor(Date.now() / 1000);
   const folder = getGalleryFolder(section);
-  const randomId = crypto.randomBytes(16).toString('hex');
-  const publicId = `${Date.now()}-${randomId}`;
 
+  // Do not generate a public ID here.
+  // Cloudinary assigns the ID after receiving the file.
   const signature = cloudinary.utils.api_sign_request(
     {
       folder,
-      public_id: publicId,
       timestamp,
     },
     apiSecret,
@@ -178,7 +201,6 @@ function createUploadSignature(
     timestamp,
     signature,
     folder,
-    publicId,
     resourceType,
   };
 }
@@ -254,10 +276,6 @@ export async function POST(request: NextRequest) {
         return errorResponse('Invalid Cloudinary public ID.');
       }
 
-      if (!isGalleryPublicId(publicId, section)) {
-        return errorResponse('Invalid Cloudinary gallery asset.');
-      }
-
       if (
         typeof originalFilename !== 'string' ||
         !originalFilename.trim()
@@ -291,8 +309,10 @@ export async function POST(request: NextRequest) {
       const verifiedResourceType = resource.resource_type;
 
       if (
-        verifiedPublicId !== publicId ||
-        verifiedResourceType !== resourceType
+        typeof verifiedPublicId !== 'string' ||
+        !verifiedPublicId ||
+        verifiedResourceType !== resourceType ||
+        !isValidCloudinaryResource(resource, section)
       ) {
         console.error('Gallery asset verification mismatch.', {
           requestedPublicId: publicId,
@@ -315,7 +335,7 @@ export async function POST(request: NextRequest) {
 
       if (verifiedBytes > maxSize) {
         try {
-          await cloudinary.uploader.destroy(publicId, {
+          await cloudinary.uploader.destroy(verifiedPublicId as string, {
             resource_type: resourceType,
           });
         } catch (deleteError) {
@@ -340,7 +360,7 @@ export async function POST(request: NextRequest) {
         !isAllowedImageFormat(verifiedFormat)
       ) {
         try {
-          await cloudinary.uploader.destroy(publicId, {
+          await cloudinary.uploader.destroy(verifiedPublicId as string, {
             resource_type: resourceType,
           });
         } catch (deleteError) {
@@ -358,7 +378,7 @@ export async function POST(request: NextRequest) {
         !isAllowedVideoFormat(verifiedFormat)
       ) {
         try {
-          await cloudinary.uploader.destroy(publicId, {
+          await cloudinary.uploader.destroy(verifiedPublicId as string, {
             resource_type: resourceType,
           });
         } catch (deleteError) {
@@ -376,7 +396,7 @@ export async function POST(request: NextRequest) {
       await ensureGalleryIndexes(db);
 
       const existing = await db.collection('gallery').findOne({
-        publicId,
+        publicId: verifiedPublicId as string,
       });
 
       if (existing) {
@@ -389,13 +409,14 @@ export async function POST(request: NextRequest) {
         typeof resource.secure_url === 'string' &&
         resource.secure_url.length > 0
           ? resource.secure_url
-          : cloudinary.url(publicId, {
+          : cloudinary.url(verifiedPublicId as string, {
               secure: true,
               resource_type: resourceType,
             });
 
       const document = {
-        publicId,
+        // Store the exact public ID returned by Cloudinary.
+        publicId: verifiedPublicId as string,
         secureUrl: verifiedSecureUrl,
         resourceType,
         section,

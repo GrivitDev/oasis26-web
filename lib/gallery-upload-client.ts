@@ -1,3 +1,4 @@
+```typescript
 export type GalleryUploadSection =
   | 'pre-wedding'
   | 'live';
@@ -12,7 +13,6 @@ export type UploadSignatureResponse = {
   timestamp: number;
   signature: string;
   folder: string;
-  publicId: string;
   resourceType: GalleryUploadResourceType;
 };
 
@@ -111,8 +111,8 @@ export async function uploadGalleryFileToCloudinary(
   formData.append('api_key', uploadSignature.apiKey);
   formData.append('timestamp', String(uploadSignature.timestamp));
   formData.append('signature', uploadSignature.signature);
+  // Do not send public_id. Cloudinary generates it.
   formData.append('folder', uploadSignature.folder);
-  formData.append('public_id', uploadSignature.publicId);
 
   const uploadUrl =
     `https://api.cloudinary.com/v1_1/${uploadSignature.cloudName}/${uploadSignature.resourceType}/upload`;
