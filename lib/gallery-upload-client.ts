@@ -1,4 +1,4 @@
-```typescript
+
 export type GalleryUploadSection =
   | 'pre-wedding'
   | 'live';
