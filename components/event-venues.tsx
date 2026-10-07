@@ -11,7 +11,7 @@ const events = [
     event: 'Traditional Marriage Rite',
     date: 'October 8, 2026',
     dateShort: '08 OCT',
-    time: '4:00 PM',
+    time: '11:00 AM',
     target: '2026-10-08T16:00:00+01:00',
     venue:
       'Bassa-Nge Anglican Grammar School, Gboloko, Kogi State.',
