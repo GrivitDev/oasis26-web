@@ -28,7 +28,7 @@ const events = [
     target: '2026-10-09T16:00:00+01:00',
     venue:
       'Phase II, Opp. Rehoboth Hospital, Lokoja, Kogi State.',
-    mapLink: 'https://maps.app.goo.gl/LPFEmFRsH5nZhfBw6?g_st=ic',
+    mapLink: 'https://maps.app.goo.gl/4HENU7NbeyMVPzmK9?g_st=ic',
     message:
       'A worship concert of praise, worship, and heartfelt celebration before the wedding day.',
     accent: 'mint',
